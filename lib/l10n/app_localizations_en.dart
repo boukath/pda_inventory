@@ -1,0 +1,110 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get appTitle => 'Mini Market PDA';
+
+  @override
+  String get home => 'Home';
+
+  @override
+  String get addProduct => 'Add Product';
+
+  @override
+  String get inventory => 'Inventory Count';
+
+  @override
+  String get exportCsv => 'Export CSV';
+
+  @override
+  String get barcode => 'Barcode';
+
+  @override
+  String get productName => 'Product Name';
+
+  @override
+  String get sellingPrice => 'Selling Price';
+
+  @override
+  String get costPrice => 'Cost Price';
+
+  @override
+  String get category => 'Category';
+
+  @override
+  String get stock => 'Current Stock';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get success => 'Success!';
+
+  @override
+  String get errorDuplicate =>
+      'A product with this barcode or name already exists!';
+
+  @override
+  String get productNotFound => 'Product not found!';
+
+  @override
+  String get updateStock => 'Update Stock';
+
+  @override
+  String get newStock => 'New Stock Count';
+
+  @override
+  String get searchHint => 'Scan Barcode or Type Name...';
+
+  @override
+  String get exportTitle => 'Export Data';
+
+  @override
+  String get totalItems => 'Total Unique Items';
+
+  @override
+  String get totalValue => 'Total Inventory Value';
+
+  @override
+  String get generateCsv => 'Generate & Share CSV';
+
+  @override
+  String get exporting => 'Generating file...';
+
+  @override
+  String get exportAll => 'Complete Inventory';
+
+  @override
+  String get exportLowStock => 'Reorder List (Low Stock)';
+
+  @override
+  String get exportCategories => 'Category Financial Summary';
+
+  @override
+  String get exportDeadStock => 'Dead Stock (0 Inventory)';
+
+  @override
+  String get printLabels => 'Print Labels';
+
+  @override
+  String get selectPrinter => 'Select Printer';
+
+  @override
+  String get connect => 'Connect';
+
+  @override
+  String get disconnect => 'Disconnect';
+
+  @override
+  String get printCopies => 'Number of Copies';
+
+  @override
+  String get printBtn => 'PRINT LABELS';
+}
