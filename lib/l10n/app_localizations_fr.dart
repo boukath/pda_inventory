@@ -9,7 +9,7 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
-  String get appTitle => 'Mini Marché PDA';
+  String get appTitle => 'BoitexScan';
 
   @override
   String get home => 'Accueil';

@@ -7,7 +7,11 @@ import '../models/product.dart';
 import '../database/db_helper.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  // 1. Added the optional initialBarcode variable
+  final String? initialBarcode;
+
+  // 2. Updated the constructor to accept it
+  const InventoryScreen({super.key, this.initialBarcode});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -33,6 +37,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 3. Pre-fill the search field if the PDA scanner sent one over!
+    if (widget.initialBarcode != null) {
+      _searchController.text = widget.initialBarcode!;
+      // Instantly trigger the search so the Edit Card pops up immediately!
+      _searchBarcode(widget.initialBarcode!);
+    }
+
     _loadData();
   }
 

@@ -1,39 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart'; // <-- New import for Provider
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'providers/locale_provider.dart'; // <-- New import for your LocaleProvider
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    // 1. We wrap the entire app in a ChangeNotifierProvider.
+    // This makes the LocaleProvider available to every single screen in your app!
+    ChangeNotifierProvider(
+      create: (context) => LocaleProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
-// We changed this to a StatefulWidget so it can update the language in real-time!
-class MyApp extends StatefulWidget {
+// 2. MyApp is back to being a clean, simple StatelessWidget!
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  // English is the default language
-  Locale _currentLocale = const Locale('en', '');
-
-  // This function will be passed to the HomeScreen to change the language
-  void _changeLanguage(Locale newLocale) {
-    setState(() {
-      _currentLocale = newLocale;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // 3. We listen to the LocaleProvider. Whenever it calls notifyListeners()
+    // (like when a user selects a new language), this widget will rebuild
+    // and update the language everywhere.
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
 
-      // We tell the app to use our currently selected locale
-      locale: _currentLocale,
+      // 4. We read the current locale directly from the provider
+      locale: localeProvider.locale,
 
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -50,8 +49,9 @@ class _MyAppState extends State<MyApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4A00E0)),
         useMaterial3: true,
       ),
-      // We pass the function to the HomeScreen so the button works
-      home: HomeScreen(onLocaleChange: _changeLanguage),
+      // 5. Look how clean this is now! No more passing the _changeLanguage
+      // function through the constructor.
+      home: const HomeScreen(),
     );
   }
 }

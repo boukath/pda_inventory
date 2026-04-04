@@ -6,7 +6,11 @@ import '../models/product.dart';
 import '../database/db_helper.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  // 1. Added the optional initialBarcode variable
+  final String? initialBarcode;
+
+  // 2. Updated the constructor to accept it
+  const AddProductScreen({super.key, this.initialBarcode});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -30,6 +34,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   void initState() {
     super.initState();
+
+    // 3. Pre-fill the barcode field if the PDA scanner sent one over!
+    if (widget.initialBarcode != null) {
+      _barcodeController.text = widget.initialBarcode!;
+    }
+
     _loadCategories(); // Fetch memory when the screen loads!
   }
 
@@ -172,110 +182,100 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       isNumber: false,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildGlassTextField(
-                            controller: _costPriceController,
-                            label: loc.costPrice,
-                            icon: Icons.attach_money,
-                            isNumber: true,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildGlassTextField(
-                            controller: _priceController,
-                            label: loc.sellingPrice,
-                            icon: Icons.sell_outlined,
-                            isNumber: true,
-                          ),
-                        ),
-                      ],
+
+                    // --- Vertically stacked pricing ---
+                    _buildGlassTextField(
+                      controller: _costPriceController,
+                      label: loc.costPrice,
+                      icon: Icons.payments_outlined,
+                      isNumber: true,
+                      prefixText: 'DZD ', // Added DZD!
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      // We use crossAxisAlignment to keep the heights aligned when dropdown shows
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          // OUR NEW SMART AUTOCOMPLETE WIDGET!
-                          child: Autocomplete<String>(
-                            optionsBuilder: (TextEditingValue textEditingValue) {
-                              if (textEditingValue.text.isEmpty) {
-                                return const Iterable<String>.empty();
-                              }
-                              // Filter existing categories by what the user is typing
-                              return _existingCategories.where((String option) {
-                                return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                              });
-                            },
-                            // The visual dropdown menu
-                            optionsViewBuilder: (context, onSelected, options) {
-                              return Align(
-                                alignment: Alignment.topLeft,
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: Container(
-                                    width: MediaQuery.of(context).size.width * 0.4, // Match width roughly
-                                    margin: const EdgeInsets.only(top: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.95), // Frosted glass dropdown
-                                      borderRadius: BorderRadius.circular(16),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 5),
+                    _buildGlassTextField(
+                      controller: _priceController,
+                      label: loc.sellingPrice,
+                      icon: Icons.sell_outlined,
+                      isNumber: true,
+                      prefixText: 'DZD ', // Added DZD!
+                    ),
+                    const SizedBox(height: 16),
+
+                    // SMART AUTOCOMPLETE WIDGET
+                    Autocomplete<String>(
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<String>.empty();
+                        }
+                        // Filter existing categories by what the user is typing
+                        return _existingCategories.where((String option) {
+                          return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        });
+                      },
+                      // The visual dropdown menu
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              // Adjust the width to fit the whole screen minus the 24px padding on each side
+                              width: MediaQuery.of(context).size.width - 48,
+                              margin: const EdgeInsets.only(top: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95), // Frosted glass dropdown
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  )
+                                ],
+                              ),
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (context, index) {
+                                  final option = options.elementAt(index);
+                                  return ListTile(
+                                    title: Text(
+                                        option,
+                                        style: GoogleFonts.poppins(
+                                            color: const Color(0xFF4A00E0),
+                                            fontWeight: FontWeight.w600
                                         )
-                                      ],
                                     ),
-                                    child: ListView.builder(
-                                      padding: EdgeInsets.zero,
-                                      shrinkWrap: true,
-                                      itemCount: options.length,
-                                      itemBuilder: (context, index) {
-                                        final option = options.elementAt(index);
-                                        return ListTile(
-                                          title: Text(
-                                              option,
-                                              style: GoogleFonts.poppins(
-                                                  color: const Color(0xFF4A00E0),
-                                                  fontWeight: FontWeight.w600
-                                              )
-                                          ),
-                                          onTap: () => onSelected(option),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                            // The actual text field you type in
-                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                              // Link the internal controller so we can save its data later!
-                              _categoryAutoController = controller;
-                              return _buildGlassTextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                label: loc.category,
-                                icon: Icons.category_outlined,
-                                isNumber: false,
-                              );
-                            },
+                                    onTap: () => onSelected(option),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildGlassTextField(
-                            controller: _stockController,
-                            label: loc.stock,
-                            icon: Icons.inventory_2_outlined,
-                            isNumber: true,
-                          ),
-                        ),
-                      ],
+                        );
+                      },
+                      // The actual text field you type in
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        // Link the internal controller so we can save its data later!
+                        _categoryAutoController = controller;
+                        return _buildGlassTextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          label: loc.category,
+                          icon: Icons.category_outlined,
+                          isNumber: false,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Vertically stacked stock field
+                    _buildGlassTextField(
+                      controller: _stockController,
+                      label: loc.stock,
+                      icon: Icons.inventory_2_outlined,
+                      isNumber: true,
                     ),
                     const SizedBox(height: 40),
 
@@ -310,13 +310,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   // --- REUSABLE GLASS TEXT FIELD ---
-  // Notice we added FocusNode so the Autocomplete menu knows when to appear!
   Widget _buildGlassTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     required bool isNumber,
     FocusNode? focusNode,
+    String? prefixText, // <-- DZD variable support
   }) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -337,6 +337,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
             labelText: label,
             labelStyle: GoogleFonts.poppins(color: Colors.white70),
             prefixIcon: Icon(icon, color: Colors.white70),
+
+            // This is where we inject the DZD prefix!
+            prefixText: prefixText,
+            prefixStyle: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+
             filled: true,
             fillColor: Colors.white.withOpacity(0.1),
             border: OutlineInputBorder(
