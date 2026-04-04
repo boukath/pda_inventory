@@ -1,12 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart'; // <-- Added for Keyboard intercept
+import 'package:flutter/services.dart'; // <-- Used for Keyboard intercept
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_localizations.dart';
-import '../database/db_helper.dart'; // <-- Added for Database checks
+import '../database/db_helper.dart'; // <-- Used for Database checks
 import 'add_product_screen.dart';
 import 'inventory_screen.dart';
 import 'export_screen.dart';
@@ -106,24 +106,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = screenWidth > 600 ? 3 : 2;
 
-    // 4. Wrap the whole Scaffold in KeyboardListener
-    return KeyboardListener(
+    // 4. Wrap the whole Scaffold in the modern Focus widget
+    return Focus(
       focusNode: _focusNode,
       autofocus: true,
-      onKeyEvent: (KeyEvent event) {
+      onKeyEvent: (FocusNode node, KeyEvent event) {
         // Only listen when a key is pressed down (ignore key release)
         if (event is KeyDownEvent) {
           // If the scanner presses "Enter", the barcode is finished!
           if (event.logicalKey == LogicalKeyboardKey.enter) {
             _processScannedBarcode(_barcodeBuffer.trim());
             _barcodeBuffer = ''; // Clear buffer for next scan
-          } else {
+            return KeyEventResult.handled; // Tell Flutter we handled this key
+          } else if (event.character != null) {
             // Append the typed character to our secret buffer
-            if (event.character != null) {
-              _barcodeBuffer += event.character!;
-            }
+            _barcodeBuffer += event.character!;
+            return KeyEventResult.handled; // Tell Flutter we handled this key
           }
         }
+        // Let other widgets handle any keys we didn't explicitly catch
+        return KeyEventResult.ignored;
       },
       child: Scaffold(
         body: Stack(

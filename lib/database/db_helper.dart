@@ -18,11 +18,17 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // I changed the version to 2 just in case you already ran the app on an emulator!
-    return await openDatabase(path, version: 2, onCreate: _createDB);
+    // 1. Bump version to 3 and add the onUpgrade parameter
+    return await openDatabase(
+      path,
+      version: 3,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB, // <-- Added this line!
+    );
   }
 
   Future _createDB(Database db, int version) async {
+    // 2. Added 'supplierName' here so fresh installs get the newest schema right away
     await db.execute('''
       CREATE TABLE products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,9 +38,26 @@ class DatabaseHelper {
         costPrice REAL NOT NULL,
         category TEXT NOT NULL,
         stock INTEGER NOT NULL,
-        lastUpdated TEXT NOT NULL
+        lastUpdated TEXT NOT NULL,
+        supplierName TEXT 
       )
     ''');
+  }
+
+  // 3. --- NEW UPGRADE METHOD ---
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // We check the oldVersion to apply changes incrementally.
+    // This allows a user on version 1 to safely upgrade all the way to version 3 or beyond.
+
+    if (oldVersion < 3) {
+      // Migrate from v2 to v3: Add the supplierName column to existing databases
+      await db.execute('ALTER TABLE products ADD COLUMN supplierName TEXT');
+    }
+
+    // In the future, if you go to version 4, you just add:
+    // if (oldVersion < 4) {
+    //   await db.execute('ALTER TABLE products ADD COLUMN anotherNewColumn TEXT');
+    // }
   }
 
   // --- DATABASE ACTIONS ---
@@ -67,6 +90,7 @@ class DatabaseHelper {
     final db = await instance.database;
     final maps = await db.query(
       'products',
+      // Note: If you start using supplierName, remember to add it to this list!
       columns: ['id', 'barcode', 'name', 'price', 'costPrice', 'category', 'stock', 'lastUpdated'],
       where: 'barcode = ?',
       whereArgs: [barcode],
@@ -116,5 +140,4 @@ class DatabaseHelper {
     // If the result is NOT empty, it means a duplicate exists (returns true)
     return result.isNotEmpty;
   }
-
 }
