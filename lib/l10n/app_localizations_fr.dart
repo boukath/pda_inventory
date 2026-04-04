@@ -107,4 +107,16 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get printBtn => 'IMPRIMER ÉTIQUETTES';
+
+  @override
+  String get filterAll => 'Tout';
+
+  @override
+  String get filterLowStock => 'Stock Faible';
+
+  @override
+  String get filterOutStock => 'Rupture de Stock';
+
+  @override
+  String get noProductsFound => 'Aucun produit trouvé.';
 }

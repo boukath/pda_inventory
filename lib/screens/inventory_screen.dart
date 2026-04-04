@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
@@ -18,51 +19,80 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Product? _scannedProduct;
 
-  // New lists to hold our database data
+  // Data lists
   List<Product> _allProducts = [];
   List<Product> _filteredProducts = [];
+  List<String> _categories = [];
+
+  // We split the filters so you can check "Low Stock" AND a specific category!
+  String _selectedStatus = 'All'; // 'All', 'Low Stock', 'Out of Stock'
+  String _selectedCategory = 'All Categories';
+
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _loadAllProducts(); // Fetch everything when screen opens
+    _loadData();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _newStockController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  // --- 1. Fetch all products from Database ---
-  Future<void> _loadAllProducts() async {
+  // --- 1. Fetch products AND categories from Database ---
+  Future<void> _loadData() async {
     final products = await DatabaseHelper.instance.readAllProducts();
+    final categories = await DatabaseHelper.instance.getUniqueCategories();
+
     setState(() {
       _allProducts = products;
-      _filteredProducts = products; // Initially, show everything
+      _categories = categories;
+      _applyFilters();
     });
   }
 
-  // --- 2. Live filter as the user types ---
-  void _filterList(String query) {
-    if (query.isEmpty) {
-      setState(() => _filteredProducts = _allProducts);
-      return;
-    }
+  // --- 2. Unified Filter Logic ---
+  void _applyFilters() {
+    final query = _searchController.text.toLowerCase();
 
     setState(() {
       _filteredProducts = _allProducts.where((product) {
-        final nameLower = product.name.toLowerCase();
-        final barcodeLower = product.barcode.toLowerCase();
-        final searchLower = query.toLowerCase();
-        // Check if the search text matches the name OR the barcode
-        return nameLower.contains(searchLower) || barcodeLower.contains(searchLower);
+        // A. Text Search Match
+        final matchesText = product.name.toLowerCase().contains(query) ||
+            product.barcode.toLowerCase().contains(query);
+        if (!matchesText) return false;
+
+        // B. Status Match (The top chips)
+        if (_selectedStatus == 'Low Stock') {
+          if (product.stock == 0 || product.stock > 10) return false;
+        } else if (_selectedStatus == 'Out of Stock') {
+          if (product.stock > 0) return false;
+        }
+
+        // C. Category Match (The dropdown sheet)
+        if (_selectedCategory != 'All Categories') {
+          if (product.category != _selectedCategory) return false;
+        }
+
+        return true;
       }).toList();
     });
   }
 
-  // --- 3. Scanner exact match (PDA Trigger) ---
+  // --- 3. Triggered when typing (Debounced) ---
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _applyFilters();
+    });
+  }
+
+  // --- Scanner exact match (PDA Trigger) ---
   Future<void> _searchBarcode(String barcode) async {
     if (barcode.isEmpty) return;
 
@@ -83,10 +113,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       }
     }
     _searchController.clear();
-    _filterList(''); // Reset the list
+    _applyFilters();
   }
 
-  // --- 4. Open the Edit Card (Used by Scanner AND Tap) ---
   void _openEditCard(Product product) {
     setState(() {
       _scannedProduct = product;
@@ -94,7 +123,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
-  // --- 5. Save the new stock ---
   Future<void> _updateStock() async {
     if (_scannedProduct != null) {
       final newStock = int.tryParse(_newStockController.text) ?? _scannedProduct!.stock;
@@ -115,8 +143,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _scannedProduct = null;
         });
 
-        // Refresh the main list to show the new stock count!
-        _loadAllProducts();
+        _loadData();
         _searchController.clear();
       }
     }
@@ -153,10 +180,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
           SafeArea(
             child: Column(
               children: [
-                // TOP SECTION: Search Bar & Edit Card
+                // TOP SECTION
                 Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // --- SEARCH BAR ---
                       ClipRRect(
@@ -167,10 +195,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             controller: _searchController,
                             style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
                             autofocus: true,
-                            onChanged: _filterList, // Filters instantly as you type!
-                            onSubmitted: _searchBarcode, // Triggers when scanner fires
+                            onChanged: _onSearchChanged,
+                            onSubmitted: _searchBarcode,
                             decoration: InputDecoration(
-                              // Using our new translated word!
                               hintText: loc.searchHint,
                               hintStyle: GoogleFonts.poppins(color: Colors.white54),
                               prefixIcon: const Icon(Icons.search, color: Colors.white),
@@ -178,7 +205,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 icon: const Icon(Icons.clear, color: Colors.white54),
                                 onPressed: () {
                                   _searchController.clear();
-                                  _filterList('');
+                                  _applyFilters();
                                 },
                               ),
                               filled: true,
@@ -192,7 +219,49 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         ),
                       ),
 
-                      // --- EDIT CARD (Pops up if item is tapped or scanned) ---
+                      const SizedBox(height: 16),
+
+                      // --- OVERFLOW PROTECTED STATUS CHIPS ---
+                      // Wrap ensures if the screen is tiny, they drop to the next line!
+                      Wrap(
+                        spacing: 8.0, // Space between chips horizontally
+                        runSpacing: 8.0, // Space between chips vertically if wrapped
+                        children: [
+                          _buildStatusChip('All', loc.filterAll, Icons.apps),
+                          _buildStatusChip('Low Stock', loc.filterLowStock, Icons.warning_amber_rounded),
+                          _buildStatusChip('Out of Stock', loc.filterOutStock, Icons.error_outline),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // --- ANIMATED CATEGORY SELECTOR BUTTON ---
+                      GestureDetector(
+                        onTap: () => _showCategoryBottomSheet(loc),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.category_outlined, color: Colors.white70, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _selectedCategory == 'All Categories' ? loc.filterAll : _selectedCategory,
+                                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // --- EDIT CARD ---
                       if (_scannedProduct != null) ...[
                         const SizedBox(height: 20),
                         _buildProductCard(loc),
@@ -206,7 +275,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   child: _filteredProducts.isEmpty
                       ? Center(
                     child: Text(
-                      "No products found.",
+                      loc.noProductsFound,
                       style: GoogleFonts.poppins(color: Colors.white54, fontSize: 18),
                     ),
                   )
@@ -227,20 +296,129 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // --- REUSABLE STATUS CHIP (Top Row) ---
+  Widget _buildStatusChip(String filterValue, String displayLabel, IconData icon) {
+    final isSelected = _selectedStatus == filterValue;
+
+    return Theme(
+      data: Theme.of(context).copyWith(canvasColor: Colors.transparent),
+      child: ChoiceChip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min, // Important for Wrap
+          children: [
+            Icon(icon, size: 16, color: isSelected ? Colors.black87 : Colors.white70),
+            const SizedBox(width: 6),
+            Text(
+              displayLabel,
+              style: GoogleFonts.poppins(
+                color: isSelected ? Colors.black87 : Colors.white,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        selected: isSelected,
+        onSelected: (bool selected) {
+          setState(() {
+            _selectedStatus = filterValue;
+          });
+          _applyFilters();
+        },
+        backgroundColor: Colors.white.withOpacity(0.1),
+        selectedColor: Colors.greenAccent.shade400,
+        showCheckmark: false,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isSelected ? Colors.greenAccent.shade400 : Colors.white.withOpacity(0.3),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- PRO BOTTOM SHEET FOR 100+ CATEGORIES ---
+  void _showCategoryBottomSheet(AppLocalizations loc) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true, // Allows the sheet to be taller!
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6, // Takes up 60% of screen
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E0045), // Matches your theme
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Little grab handle at the top
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                height: 5,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white30,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              Text(
+                "Select Category",
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+
+              // Scrollable list of all your categories
+              Expanded(
+                child: ListView(
+                  children: [
+                    _buildBottomSheetItem('All Categories', loc.filterAll),
+                    ..._categories.map((c) => _buildBottomSheetItem(c, c)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --- BOTTOM SHEET LIST TILE ---
+  Widget _buildBottomSheetItem(String value, String displayLabel) {
+    final isSelected = _selectedCategory == value;
+    return ListTile(
+      title: Text(
+        displayLabel,
+        style: GoogleFonts.poppins(
+          color: isSelected ? Colors.greenAccent.shade400 : Colors.white,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing: isSelected ? Icon(Icons.check_circle, color: Colors.greenAccent.shade400) : null,
+      onTap: () {
+        setState(() {
+          _selectedCategory = value;
+        });
+        _applyFilters();
+        Navigator.pop(context); // Close the sheet automatically!
+      },
+    );
+  }
+
   // --- PRO 2026 GLASS LIST TILE ---
   Widget _buildListTile(Product product) {
-    // Determine Stock Badge Color
     Color badgeColor;
     if (product.stock == 0) {
-      badgeColor = Colors.redAccent.shade400; // Out of stock!
+      badgeColor = Colors.redAccent.shade400;
     } else if (product.stock <= 10) {
-      badgeColor = Colors.orangeAccent.shade400; // Running low
+      badgeColor = Colors.orangeAccent.shade400;
     } else {
-      badgeColor = Colors.greenAccent.shade400; // Healthy stock
+      badgeColor = Colors.greenAccent.shade400;
     }
 
     return GestureDetector(
-      onTap: () => _openEditCard(product), // Tap to edit!
+      onTap: () => _openEditCard(product),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -262,7 +440,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               child: Row(
                 children: [
-                  // Category Icon Background
                   Container(
                     height: 50,
                     width: 50,
@@ -273,8 +450,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: const Icon(Icons.inventory_2_outlined, color: Colors.white),
                   ),
                   const SizedBox(width: 16),
-
-                  // Product Details
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,14 +461,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          "${product.category} • \$${product.price.toStringAsFixed(2)}",
+                          "${product.category} • ${product.price.toStringAsFixed(2)} DZD",
                           style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
                         ),
                       ],
                     ),
                   ),
-
-                  // Glowing Stock Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -319,7 +492,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // --- REUSABLE PRODUCT INFO CARD (Kept exactly as you had it, just integrated!) ---
+  // --- REUSABLE PRODUCT INFO CARD ---
   Widget _buildProductCard(AppLocalizations loc) {
     return Container(
       decoration: BoxDecoration(
@@ -349,7 +522,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       _scannedProduct!.category.toUpperCase(),
                       style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.5),
                     ),
-                    // Add a close button to dismiss the card
                     GestureDetector(
                       onTap: () => setState(() => _scannedProduct = null),
                       child: const Icon(Icons.close, color: Colors.white70),

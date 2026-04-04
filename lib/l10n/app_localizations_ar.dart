@@ -99,11 +99,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get connect => 'اتصال';
 
   @override
-  String get disconnect => 'قطع الاتصال';
+  String get disconnect => 'فصل';
 
   @override
   String get printCopies => 'عدد النسخ';
 
   @override
   String get printBtn => 'طباعة الملصقات';
+
+  @override
+  String get filterAll => 'الكل';
+
+  @override
+  String get filterLowStock => 'مخزون منخفض';
+
+  @override
+  String get filterOutStock => 'نفاد المخزون';
+
+  @override
+  String get noProductsFound => 'لم يتم العثور على أي منتج.';
 }

@@ -31,5 +31,9 @@
   "connect": "Connecter",
   "disconnect": "Déconnecter",
   "printCopies": "Nombre de copies",
-  "printBtn": "IMPRIMER ÉTIQUETTES"
+  "printBtn": "IMPRIMER ÉTIQUETTES",
+  "filterAll": "Tout",
+  "filterLowStock": "Stock Faible",
+  "filterOutStock": "Rupture de Stock",
+  "noProductsFound": "Aucun produit trouvé."
 }

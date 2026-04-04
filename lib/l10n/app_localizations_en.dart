@@ -107,4 +107,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printBtn => 'PRINT LABELS';
+
+  @override
+  String get filterAll => 'All';
+
+  @override
+  String get filterLowStock => 'Low Stock';
+
+  @override
+  String get filterOutStock => 'Out of Stock';
+
+  @override
+  String get noProductsFound => 'No products found.';
 }

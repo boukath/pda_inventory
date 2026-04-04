@@ -297,6 +297,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PRINT LABELS'**
   String get printBtn;
+
+  /// No description provided for @filterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get filterAll;
+
+  /// No description provided for @filterLowStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Low Stock'**
+  String get filterLowStock;
+
+  /// No description provided for @filterOutStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of Stock'**
+  String get filterOutStock;
+
+  /// No description provided for @noProductsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No products found.'**
+  String get noProductsFound;
 }
 
 class _AppLocalizationsDelegate

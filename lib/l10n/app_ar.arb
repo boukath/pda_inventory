@@ -29,7 +29,11 @@
   "printLabels": "طباعة الملصقات",
   "selectPrinter": "اختر الطابعة",
   "connect": "اتصال",
-  "disconnect": "قطع الاتصال",
+  "disconnect": "فصل",
   "printCopies": "عدد النسخ",
-  "printBtn": "طباعة الملصقات"
+  "printBtn": "طباعة الملصقات",
+  "filterAll": "الكل",
+  "filterLowStock": "مخزون منخفض",
+  "filterOutStock": "نفاد المخزون",
+  "noProductsFound": "لم يتم العثور على أي منتج."
 }

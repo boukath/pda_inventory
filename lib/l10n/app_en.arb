@@ -31,5 +31,9 @@
   "connect": "Connect",
   "disconnect": "Disconnect",
   "printCopies": "Number of Copies",
-  "printBtn": "PRINT LABELS"
+  "printBtn": "PRINT LABELS",
+  "filterAll": "All",
+  "filterLowStock": "Low Stock",
+  "filterOutStock": "Out of Stock",
+  "noProductsFound": "No products found."
 }
