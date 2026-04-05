@@ -119,4 +119,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noProductsFound => 'No products found.';
+
+  @override
+  String get simpleMenuTitle => 'Scanner Dashboard';
+
+  @override
+  String get reception => 'Receiving';
+
+  @override
+  String get bon => 'Orders / Vouchers';
+
+  @override
+  String get comingSoon => 'Coming Soon!';
+
+  @override
+  String get readyToScan => 'Ready to scan...\nPoint PDA at barcode.';
+
+  @override
+  String get developerMode => 'Developer Mode';
+
+  @override
+  String get enterAdminPin => 'Enter Admin PIN';
+
+  @override
+  String get unlock => 'Unlock';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get incorrectPin => 'Incorrect PIN';
+
+  @override
+  String get scannedItem => 'Scanned: ';
 }

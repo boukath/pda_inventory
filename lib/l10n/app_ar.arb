@@ -35,5 +35,16 @@
   "filterAll": "الكل",
   "filterLowStock": "مخزون منخفض",
   "filterOutStock": "نفاد المخزون",
-  "noProductsFound": "لم يتم العثور على أي منتج."
+  "noProductsFound": "لم يتم العثور على أي منتج.",
+  "simpleMenuTitle": "لوحة تحكم المسح",
+  "reception": "استلام البضائع",
+  "bon": "السندات / الطلبيات",
+  "comingSoon": "قريباً!",
+  "readyToScan": "جاهز للمسح...\nقم بتوجيه الجهاز نحو الباركود.",
+  "developerMode": "وضع المطور",
+  "enterAdminPin": "أدخل رمز المسؤول",
+  "unlock": "فتح",
+  "cancel": "إلغاء",
+  "incorrectPin": "الرمز غير صحيح",
+  "scannedItem": "تم مسح: "
 }

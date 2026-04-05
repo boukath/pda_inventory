@@ -35,5 +35,16 @@
   "filterAll": "Tout",
   "filterLowStock": "Stock Faible",
   "filterOutStock": "Rupture de Stock",
-  "noProductsFound": "Aucun produit trouvé."
+  "noProductsFound": "Aucun produit trouvé.",
+  "simpleMenuTitle": "Tableau de Bord",
+  "reception": "Réception",
+  "bon": "Bons / Commandes",
+  "comingSoon": "Bientôt disponible !",
+  "readyToScan": "Prêt à scanner...\nPointez le PDA vers le code-barres.",
+  "developerMode": "Mode Développeur",
+  "enterAdminPin": "Saisir le code PIN",
+  "unlock": "Déverrouiller",
+  "cancel": "Annuler",
+  "incorrectPin": "Code PIN incorrect",
+  "scannedItem": "Scanné : "
 }

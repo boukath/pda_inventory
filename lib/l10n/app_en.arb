@@ -35,5 +35,16 @@
   "filterAll": "All",
   "filterLowStock": "Low Stock",
   "filterOutStock": "Out of Stock",
-  "noProductsFound": "No products found."
+  "noProductsFound": "No products found.",
+  "simpleMenuTitle": "Scanner Dashboard",
+  "reception": "Receiving",
+  "bon": "Orders / Vouchers",
+  "comingSoon": "Coming Soon!",
+  "readyToScan": "Ready to scan...\nPoint PDA at barcode.",
+  "developerMode": "Developer Mode",
+  "enterAdminPin": "Enter Admin PIN",
+  "unlock": "Unlock",
+  "cancel": "Cancel",
+  "incorrectPin": "Incorrect PIN",
+  "scannedItem": "Scanned: "
 }

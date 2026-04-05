@@ -321,6 +321,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No products found.'**
   String get noProductsFound;
+
+  /// No description provided for @simpleMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanner Dashboard'**
+  String get simpleMenuTitle;
+
+  /// No description provided for @reception.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving'**
+  String get reception;
+
+  /// No description provided for @bon.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders / Vouchers'**
+  String get bon;
+
+  /// No description provided for @comingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming Soon!'**
+  String get comingSoon;
+
+  /// No description provided for @readyToScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to scan...\nPoint PDA at barcode.'**
+  String get readyToScan;
+
+  /// No description provided for @developerMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer Mode'**
+  String get developerMode;
+
+  /// No description provided for @enterAdminPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Admin PIN'**
+  String get enterAdminPin;
+
+  /// No description provided for @unlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get unlock;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @incorrectPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN'**
+  String get incorrectPin;
+
+  /// No description provided for @scannedItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanned: '**
+  String get scannedItem;
 }
 
 class _AppLocalizationsDelegate

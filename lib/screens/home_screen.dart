@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async'; // <-- New import for Timers
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart'; // <-- Used for Keyboard intercept
@@ -11,6 +12,7 @@ import 'add_product_screen.dart';
 import 'inventory_screen.dart';
 import 'export_screen.dart';
 import 'print_labels_screen.dart';
+import 'mode_selection_screen.dart'; // <-- New import for Kiosk Escape
 
 // 1. Changed to StatefulWidget to manage Focus and state
 class HomeScreen extends StatefulWidget {
@@ -24,6 +26,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // 2. We use a FocusNode to secretly listen to the PDA scanner keystrokes
   final FocusNode _focusNode = FocusNode();
   String _barcodeBuffer = '';
+  Timer? _scanTimer; // <-- Added for scanner debounce
+
+  // --- 3. SECRET ADMIN MENU VARIABLES ---
+  int _secretTapCount = 0;
+  Timer? _secretTapTimer;
+  final String _adminPin = "2026"; // <-- Your Kiosk Escape PIN
 
   @override
   void initState() {
@@ -34,11 +42,93 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _scanTimer?.cancel(); // Cancel scanner timer
+    _secretTapTimer?.cancel(); // Cancel secret Kiosk timer
     _focusNode.dispose();
     super.dispose();
   }
 
-  // 3. This function processes the complete barcode after the scanner hits 'Enter'
+  // --- 4. SECRET TAP LOGIC ---
+  void _handleSecretTap() {
+    _secretTapCount++;
+
+    // Reset the counter if they stop tapping for more than 1 second
+    _secretTapTimer?.cancel();
+    _secretTapTimer = Timer(const Duration(milliseconds: 1000), () {
+      _secretTapCount = 0;
+    });
+
+    // If they tap 7 times fast, trigger the PIN pad!
+    if (_secretTapCount >= 7) {
+      _secretTapCount = 0; // Reset
+      _showAdminPinDialog();
+    }
+  }
+
+  // --- 5. THE ADMIN PIN DIALOG ---
+  void _showAdminPinDialog() {
+    final TextEditingController pinController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Force them to enter pin or cancel
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+            "Developer Mode",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045))
+        ),
+        content: TextField(
+          controller: pinController,
+          obscureText: true, // Hides the PIN as they type
+          keyboardType: TextInputType.number,
+          maxLength: 4, // Assuming a 4-digit PIN
+          decoration: const InputDecoration(
+            labelText: "Enter Admin PIN",
+            prefixIcon: Icon(Icons.lock),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _focusNode.requestFocus(); // Give scanner focus back
+            },
+            child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A00E0),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              if (pinController.text == _adminPin) {
+                // SUCCESS! Take the developer to the secret mode selection screen
+                Navigator.pop(context);
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ModeSelectionScreen()),
+                      (route) => false,
+                );
+              } else {
+                // FAILURE! Wrong PIN.
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Incorrect PIN"), backgroundColor: Colors.red),
+                );
+                _focusNode.requestFocus();
+              }
+            },
+            child: Text("Unlock", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 6. This function processes the complete barcode after the scanner hits 'Enter'
   Future<void> _processScannedBarcode(String barcode) async {
     if (barcode.isEmpty) return;
 
@@ -52,9 +142,9 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => InventoryScreen(initialBarcode: barcode), // <-- Passed here!
+          builder: (context) => InventoryScreen(initialBarcode: barcode),
         ),
-      ).then((_) => _focusNode.requestFocus()); // Re-request focus when returning
+      ).then((_) => _focusNode.requestFocus());
     } else {
       // Product DOES NOT EXIST -> Show suggestion dialog
       showDialog(
@@ -73,8 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _focusNode.requestFocus(); // Re-focus on background
+                Navigator.pop(context);
+                _focusNode.requestFocus();
               },
               child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
             ),
@@ -85,13 +175,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => AddProductScreen(initialBarcode: barcode), // <-- Passed here!
+                    builder: (context) => AddProductScreen(initialBarcode: barcode),
                   ),
-                ).then((_) => _focusNode.requestFocus()); // Re-request focus when returning
+                ).then((_) => _focusNode.requestFocus());
               },
               child: Text(AppLocalizations.of(context)!.addProduct, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
             ),
@@ -106,25 +196,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = screenWidth > 600 ? 3 : 2;
 
-    // 4. Wrap the whole Scaffold in the modern Focus widget
+    // 7. Wrap the whole Scaffold in the modern Focus widget
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: (FocusNode node, KeyEvent event) {
-        // Only listen when a key is pressed down (ignore key release)
         if (event is KeyDownEvent) {
-          // If the scanner presses "Enter", the barcode is finished!
+          _scanTimer?.cancel(); // Reset debounce timer
+
           if (event.logicalKey == LogicalKeyboardKey.enter) {
             _processScannedBarcode(_barcodeBuffer.trim());
             _barcodeBuffer = ''; // Clear buffer for next scan
-            return KeyEventResult.handled; // Tell Flutter we handled this key
+            return KeyEventResult.handled;
           } else if (event.character != null) {
-            // Append the typed character to our secret buffer
             _barcodeBuffer += event.character!;
-            return KeyEventResult.handled; // Tell Flutter we handled this key
+            // Start 150ms countdown to clear broken scans
+            _scanTimer = Timer(const Duration(milliseconds: 150), () {
+              _barcodeBuffer = '';
+            });
+            return KeyEventResult.handled;
           }
         }
-        // Let other widgets handle any keys we didn't explicitly catch
         return KeyEventResult.ignored;
       },
       child: Scaffold(
@@ -148,9 +240,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          AppLocalizations.of(context)!.appTitle,
-                          style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0),
+                        // --- 8. WRAPPED THE TITLE IN GESTURE DETECTOR ---
+                        GestureDetector(
+                          onTap: _handleSecretTap, // Hidden 7-tap trigger
+                          child: Container(
+                            color: Colors.transparent, // Ensures the whole area is tappable
+                            child: Text(
+                              AppLocalizations.of(context)!.appTitle,
+                              style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0),
+                            ),
+                          ),
                         ),
                         _buildLanguageButton(context),
                       ],

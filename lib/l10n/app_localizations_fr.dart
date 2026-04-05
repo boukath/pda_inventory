@@ -119,4 +119,38 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get noProductsFound => 'Aucun produit trouvé.';
+
+  @override
+  String get simpleMenuTitle => 'Tableau de Bord';
+
+  @override
+  String get reception => 'Réception';
+
+  @override
+  String get bon => 'Bons / Commandes';
+
+  @override
+  String get comingSoon => 'Bientôt disponible !';
+
+  @override
+  String get readyToScan =>
+      'Prêt à scanner...\nPointez le PDA vers le code-barres.';
+
+  @override
+  String get developerMode => 'Mode Développeur';
+
+  @override
+  String get enterAdminPin => 'Saisir le code PIN';
+
+  @override
+  String get unlock => 'Déverrouiller';
+
+  @override
+  String get cancel => 'Annuler';
+
+  @override
+  String get incorrectPin => 'Code PIN incorrect';
+
+  @override
+  String get scannedItem => 'Scanné : ';
 }

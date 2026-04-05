@@ -118,4 +118,37 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noProductsFound => 'لم يتم العثور على أي منتج.';
+
+  @override
+  String get simpleMenuTitle => 'لوحة تحكم المسح';
+
+  @override
+  String get reception => 'استلام البضائع';
+
+  @override
+  String get bon => 'السندات / الطلبيات';
+
+  @override
+  String get comingSoon => 'قريباً!';
+
+  @override
+  String get readyToScan => 'جاهز للمسح...\nقم بتوجيه الجهاز نحو الباركود.';
+
+  @override
+  String get developerMode => 'وضع المطور';
+
+  @override
+  String get enterAdminPin => 'أدخل رمز المسؤول';
+
+  @override
+  String get unlock => 'فتح';
+
+  @override
+  String get cancel => 'إلغاء';
+
+  @override
+  String get incorrectPin => 'الرمز غير صحيح';
+
+  @override
+  String get scannedItem => 'تم مسح: ';
 }
