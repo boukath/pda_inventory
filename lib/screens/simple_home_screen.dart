@@ -6,12 +6,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart'; // <-- Needed to intercept hardware scanner keys!
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import 'simple_reception_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/locale_provider.dart';
 import '../database/simple_db_helper.dart'; // <-- Needed to save scans from the dashboard
 import 'simple_inventory_screen.dart';
 import 'mode_selection_screen.dart';
+import 'simple_orders_screen.dart';
 
 class SimpleHomeScreen extends StatefulWidget {
   const SimpleHomeScreen({super.key});
@@ -30,6 +32,9 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
   int _secretTapCount = 0;
   Timer? _secretTapTimer;
   final String _adminPin = "2026";
+
+  // --- NEW: WIPE DATABASE PASSWORD ---
+  final String _wipePassword = "Boitexinfo";
 
   @override
   void initState() {
@@ -63,6 +68,75 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
         content: Text("${loc.scannedItem}$barcode"),
         backgroundColor: Colors.green,
         duration: const Duration(milliseconds: 500),
+      ),
+    );
+  }
+
+  // --- NEW: SECURE DATABASE WIPE LOGIC ---
+  void _showClearDatabaseDialog() {
+    final TextEditingController passwordController = TextEditingController();
+    final loc = AppLocalizations.of(context)!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+            "Clear Device Data",
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.red.shade700)
+        ),
+        content: TextField(
+          controller: passwordController,
+          obscureText: true, // Hides the password with dots
+          decoration: InputDecoration(
+            labelText: "Enter Security Password",
+            prefixIcon: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _focusNode.requestFocus(); // Give focus back to the scanner
+              },
+              child: Text(loc.cancel, style: GoogleFonts.poppins(color: Colors.grey))
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              // Check if the user typed "Boitexinfo"
+              if (passwordController.text == _wipePassword) {
+                // Password is correct, wipe the database!
+                await SimpleDatabaseHelper.instance.clearAllData();
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text("All data successfully cleared!", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                      backgroundColor: Colors.green
+                  ));
+                  _focusNode.requestFocus();
+                }
+              } else {
+                // Wrong password!
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(loc.incorrectPin),
+                    backgroundColor: Colors.red
+                ));
+                _focusNode.requestFocus();
+              }
+            },
+            child: Text("CLEAR ALL", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -180,21 +254,55 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                    padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        GestureDetector(
-                          onTap: _handleSecretTap,
-                          child: Container(
-                            color: Colors.transparent,
-                            child: Text(
+                        // --- FIX: Wrapped the Title in an Expanded widget ---
+                        // This prevents overflow by allowing the text to take available space
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _handleSecretTap,
+                            child: Container(
+                              color: Colors.transparent,
+                              child: Text(
                                 loc.simpleMenuTitle,
-                                style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0)
+                                style: GoogleFonts.poppins(
+                                    fontSize: 22, // Slightly reduced to fit PDA screens better
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5
+                                ),
+                                maxLines: 2, // Allows wrapping to a second line safely
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ),
-                        _buildLanguageButton(context),
+
+                        const SizedBox(width: 8), // Breathing room between text and buttons
+
+                        // --- Buttons Container ---
+                        Row(
+                          mainAxisSize: MainAxisSize.min, // Ensures buttons only take necessary space
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(CupertinoIcons.trash, color: Colors.white, size: 22),
+                                tooltip: "Clear All Data",
+                                onPressed: _showClearDatabaseDialog,
+                              ),
+                            ),
+                            _buildLanguageButton(context),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -215,19 +323,18 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
                               Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (context) => const SimpleInventoryScreen())
-                              ).then((_) => _focusNode.requestFocus()); // <-- 4. Re-request focus when returning from screen!
+                              ).then((_) => _focusNode.requestFocus());
                             },
                           ),
                           _buildGlassCard(
                             context: context,
-                            title: loc.reception, // Uses your localized string
+                            title: loc.reception,
                             icon: CupertinoIcons.tray_arrow_down,
                             onTap: () {
-                              // REMOVE the SnackBar and add this navigation:
                               Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (context) => const SimpleReceptionScreen())
-                              ).then((_) => _focusNode.requestFocus()); // Keep this so it can scan when you return
+                              ).then((_) => _focusNode.requestFocus());
                             },
                           ),
                           _buildGlassCard(
@@ -235,8 +342,10 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
                             title: loc.bon,
                             icon: CupertinoIcons.doc_text,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.comingSoon)));
-                              _focusNode.requestFocus(); // Re-request focus after tapping
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const SimpleOrdersScreen())
+                              ).then((_) => _focusNode.requestFocus());
                             },
                           ),
                         ],
@@ -306,7 +415,7 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
         border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
       child: PopupMenuButton<String>(
-        icon: const Icon(CupertinoIcons.globe, color: Colors.white),
+        icon: const Icon(CupertinoIcons.globe, color: Colors.white, size: 22),
         color: Colors.white.withOpacity(0.95),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onSelected: (String languageCode) {

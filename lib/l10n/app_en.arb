@@ -36,7 +36,7 @@
   "filterLowStock": "Low Stock",
   "filterOutStock": "Out of Stock",
   "noProductsFound": "No products found.",
-  "simpleMenuTitle": "Scanner Dashboard",
+  "simpleMenuTitle": "Scan Dashboard",
   "reception": "Receiving",
   "bon": "Orders / Vouchers",
   "comingSoon": "Coming Soon!",
@@ -55,5 +55,11 @@
   "receivingLogTitle": "Receiving Log",
   "readyToReceiveHint": "Ready to receive.\nScan a product to begin.",
   "supplierPrefix": "Supplier: ",
-  "supplierNone": "None"
+  "supplierNone": "None",
+  "finalizeAndSaveOrder": "Finalize & Save Order",
+  "orderSavedSuccess": "Order Saved Successfully!",
+  "noOrdersFound": "No orders found.\nSave an inventory session first!",
+  "qty": "Qty",
+  "manualEntryTitle": "Manual Entry",
+  "date": "Date"
 }

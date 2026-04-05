@@ -325,7 +325,7 @@ abstract class AppLocalizations {
   /// No description provided for @simpleMenuTitle.
   ///
   /// In en, this message translates to:
-  /// **'Scanner Dashboard'**
+  /// **'Scan Dashboard'**
   String get simpleMenuTitle;
 
   /// No description provided for @reception.
@@ -441,6 +441,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'None'**
   String get supplierNone;
+
+  /// No description provided for @finalizeAndSaveOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize & Save Order'**
+  String get finalizeAndSaveOrder;
+
+  /// No description provided for @orderSavedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Saved Successfully!'**
+  String get orderSavedSuccess;
+
+  /// No description provided for @noOrdersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No orders found.\nSave an inventory session first!'**
+  String get noOrdersFound;
+
+  /// No description provided for @qty.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty'**
+  String get qty;
+
+  /// No description provided for @manualEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Entry'**
+  String get manualEntryTitle;
+
+  /// No description provided for @date.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get date;
 }
 
 class _AppLocalizationsDelegate

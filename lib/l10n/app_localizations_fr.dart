@@ -181,4 +181,23 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get supplierNone => 'Aucun';
+
+  @override
+  String get finalizeAndSaveOrder => 'Finaliser et Enregistrer';
+
+  @override
+  String get orderSavedSuccess => 'Commande Enregistrée avec Succès !';
+
+  @override
+  String get noOrdersFound =>
+      'Aucune commande trouvée.\nEnregistrez d\'abord une session d\'inventaire !';
+
+  @override
+  String get qty => 'Qté';
+
+  @override
+  String get manualEntryTitle => 'Saisie Manuelle';
+
+  @override
+  String get date => 'Date';
 }

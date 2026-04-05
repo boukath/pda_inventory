@@ -55,5 +55,11 @@
   "receivingLogTitle": "Journal de réception",
   "readyToReceiveHint": "Prêt à recevoir.\nScannez un produit pour commencer.",
   "supplierPrefix": "Fournisseur : ",
-  "supplierNone": "Aucun"
+  "supplierNone": "Aucun",
+  "finalizeAndSaveOrder": "Finaliser et Enregistrer",
+  "orderSavedSuccess": "Commande Enregistrée avec Succès !",
+  "noOrdersFound": "Aucune commande trouvée.\nEnregistrez d'abord une session d'inventaire !",
+  "qty": "Qté",
+  "manualEntryTitle": "Saisie Manuelle",
+  "date": "Date"
 }

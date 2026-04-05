@@ -1,13 +1,15 @@
+// File: lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // <-- New import for saving preferences
+import 'package:shared_preferences/shared_preferences.dart'; // <-- Needed for saving preferences
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
-import 'screens/mode_selection_screen.dart'; // <-- New import for the Selection Screen
-import 'screens/simple_home_screen.dart'; // <-- New import for the Simple Scanner Screen
+import 'screens/mode_selection_screen.dart';
+import 'screens/simple_home_screen.dart';
 import 'providers/locale_provider.dart';
+import 'screens/splash_screen.dart'; // <-- Import the new Splash Screen
 
 // 1. main() is now 'async' so we can check SharedPreferences before the app loads
 void main() async {
@@ -36,10 +38,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
 
-    // --- 1. NEW PREMIUM LOGIC ---
-    // If it's explicitly set to false, go to Advanced.
-    // Otherwise (if it's true, OR if it's null on a fresh install), go to Simple Mode.
-    // The client NEVER sees the Mode Selection screen automatically!
+    // --- 1. PREMIUM LOGIC ---
+    // Figure out where the user is supposed to go after the splash screen
     Widget startScreen;
     if (initialIsSimpleMode == false) {
       startScreen = const HomeScreen();
@@ -66,7 +66,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4A00E0)),
         useMaterial3: true,
       ),
-      home: startScreen,
+      // --- 2. SHOW SPLASH SCREEN FIRST ---
+      // We pass the startScreen to the splash screen so it knows where to go next!
+      home: SplashScreen(nextScreen: startScreen),
     );
   }
 }

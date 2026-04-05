@@ -178,4 +178,23 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get supplierNone => 'لا يوجد';
+
+  @override
+  String get finalizeAndSaveOrder => 'إنهاء وحفظ الطلب';
+
+  @override
+  String get orderSavedSuccess => 'تم حفظ الطلب بنجاح!';
+
+  @override
+  String get noOrdersFound =>
+      'لم يتم العثور على طلبات.\nقم بحفظ جلسة جرد أولاً!';
+
+  @override
+  String get qty => 'الكمية';
+
+  @override
+  String get manualEntryTitle => 'إدخال يدوي';
+
+  @override
+  String get date => 'التاريخ';
 }

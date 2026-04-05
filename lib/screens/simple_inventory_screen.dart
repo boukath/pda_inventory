@@ -200,7 +200,6 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
 
   // --- UPDATED: THE GIANT TOGGLE WIDGET ---
   Widget _buildGiantToggle() {
-    // 1. Get the localizations!
     final loc = AppLocalizations.of(context)!;
 
     return Container(
@@ -230,7 +229,7 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    loc.toggleCount, // <-- CHANGED HERE
+                    loc.toggleCount,
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -259,7 +258,7 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    loc.toggleCheck, // <-- CHANGED HERE
+                    loc.toggleCheck,
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -367,6 +366,43 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
                 ),
               ),
             ],
+          ),
+          // --- NEW: SAVE ORDER BOTTOM BAR ---
+          bottomNavigationBar: _scannedItems.isEmpty ? null : Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, -5))],
+            ),
+            child: SafeArea(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.save),
+                label: Text("Finalize & Save Order", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A00E0),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () async {
+                  // Save the order to DB
+                  await SimpleDatabaseHelper.instance.saveInventoryAsOrder();
+
+                  // Reload the empty list
+                  await _loadData();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text("Order Saved Successfully!", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                          backgroundColor: Colors.green
+                      ),
+                    );
+                  }
+                  _focusNode.requestFocus();
+                },
+              ),
+            ),
           ),
         ),
       ),

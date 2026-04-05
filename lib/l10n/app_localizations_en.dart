@@ -121,7 +121,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noProductsFound => 'No products found.';
 
   @override
-  String get simpleMenuTitle => 'Scanner Dashboard';
+  String get simpleMenuTitle => 'Scan Dashboard';
 
   @override
   String get reception => 'Receiving';
@@ -180,4 +180,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supplierNone => 'None';
+
+  @override
+  String get finalizeAndSaveOrder => 'Finalize & Save Order';
+
+  @override
+  String get orderSavedSuccess => 'Order Saved Successfully!';
+
+  @override
+  String get noOrdersFound =>
+      'No orders found.\nSave an inventory session first!';
+
+  @override
+  String get qty => 'Qty';
+
+  @override
+  String get manualEntryTitle => 'Manual Entry';
+
+  @override
+  String get date => 'Date';
 }

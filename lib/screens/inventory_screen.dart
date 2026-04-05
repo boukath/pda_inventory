@@ -1,3 +1,4 @@
+// File: lib/screens/inventory_screen.dart
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -206,7 +207,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           child: TextField(
                             controller: _searchController,
                             style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-                            autofocus: true,
+                            // --- CHANGED: Disabled autofocus so keyboard doesn't pop up! ---
+                            autofocus: false,
                             onChanged: _onSearchChanged,
                             onSubmitted: _searchBarcode,
                             decoration: InputDecoration(
@@ -234,10 +236,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       const SizedBox(height: 16),
 
                       // --- OVERFLOW PROTECTED STATUS CHIPS ---
-                      // Wrap ensures if the screen is tiny, they drop to the next line!
                       Wrap(
-                        spacing: 8.0, // Space between chips horizontally
-                        runSpacing: 8.0, // Space between chips vertically if wrapped
+                        spacing: 8.0,
+                        runSpacing: 8.0,
                         children: [
                           _buildStatusChip('All', loc.filterAll, Icons.apps),
                           _buildStatusChip('Low Stock', loc.filterLowStock, Icons.warning_amber_rounded),
@@ -354,17 +355,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      isScrollControlled: true, // Allows the sheet to be taller!
+      isScrollControlled: true,
       builder: (context) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.6, // Takes up 60% of screen
+          height: MediaQuery.of(context).size.height * 0.6,
           decoration: const BoxDecoration(
-            color: Color(0xFF1E0045), // Matches your theme
+            color: Color(0xFF1E0045),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
-              // Little grab handle at the top
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 height: 5,
@@ -380,7 +380,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
               const SizedBox(height: 10),
 
-              // Scrollable list of all your categories
               Expanded(
                 child: ListView(
                   children: [
@@ -413,7 +412,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _selectedCategory = value;
         });
         _applyFilters();
-        Navigator.pop(context); // Close the sheet automatically!
+        Navigator.pop(context);
       },
     );
   }
@@ -561,6 +560,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         controller: _newStockController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
+                        // --- NEW: Also disabled autofocus here just in case! ---
+                        autofocus: false,
                         style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                         decoration: InputDecoration(
                           filled: true,

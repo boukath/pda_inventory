@@ -21,9 +21,9 @@ class SimpleDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, // <-- 1. Bumped version to 2 for the Reception update
+      version: 3, // <-- BUMPED TO VERSION 3 FOR ORDERS
       onCreate: _createDB,
-      onUpgrade: _upgradeDB, // <-- 2. Added upgrade script to safely add the new table
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -46,6 +46,9 @@ class SimpleDatabaseHelper {
         timestamp TEXT NOT NULL
       )
     ''');
+
+    // V3: Create Orders Tables
+    await _createOrderTables(db);
   }
 
   // --- NEW: UPGRADE DATABASE ---
@@ -63,6 +66,29 @@ class SimpleDatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 3) {
+      // Add Orders tables for existing users upgrading to v3
+      await _createOrderTables(db);
+    }
+  }
+
+  // Helper method to create order tables for V3
+  Future<void> _createOrderTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE simple_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE simple_order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        barcode TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        FOREIGN KEY (order_id) REFERENCES simple_orders (id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   // ==========================================
@@ -142,5 +168,72 @@ class SimpleDatabaseHelper {
     final db = await instance.database;
     // Show the newest scans at the top of the list
     return await db.query('simple_reception', orderBy: 'timestamp DESC');
+  }
+
+  // ==========================================
+  // --- ACTIONS FOR ORDERS & VOUCHERS ---
+  // ==========================================
+
+  // 1. Takes everything currently scanned in inventory, saves it as an order, and clears the screen!
+  Future<void> saveInventoryAsOrder() async {
+    final db = await instance.database;
+    final items = await db.query('simple_inventory');
+
+    if (items.isEmpty) return; // Don't save empty orders
+
+    // We use a transaction so if something fails, data isn't lost
+    await db.transaction((txn) async {
+      // 1. Create the new order with the exact date/time
+      final orderId = await txn.insert('simple_orders', {
+        'timestamp': DateTime.now().toIso8601String()
+      });
+
+      // 2. Move all items into the simple_order_items table
+      for (var item in items) {
+        await txn.insert('simple_order_items', {
+          'order_id': orderId,
+          'barcode': item['barcode'],
+          'quantity': item['quantity']
+        });
+      }
+
+      // 3. Clear the simple_inventory table so the PDA is ready for the next job!
+      await txn.delete('simple_inventory');
+    });
+  }
+
+  // 2. Fetch all historical orders AND their items simultaneously for the UI
+  Future<List<Map<String, dynamic>>> getOrdersWithItems() async {
+    final db = await instance.database;
+    final orders = await db.query('simple_orders', orderBy: 'timestamp DESC');
+
+    List<Map<String, dynamic>> fullOrderHistory = [];
+
+    for (var order in orders) {
+      final items = await db.query('simple_order_items', where: 'order_id = ?', whereArgs: [order['id']]);
+      fullOrderHistory.add({
+        'order': order,
+        'items': items,
+      });
+    }
+
+    return fullOrderHistory;
+  }
+
+  // ==========================================
+  // --- ACTIONS FOR SYSTEM MANAGEMENT ---
+  // ==========================================
+
+  // Completely wipes all data to prepare the PDA for the next client
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+
+    // We use a transaction to ensure everything deletes safely together
+    await db.transaction((txn) async {
+      await txn.delete('simple_inventory');
+      await txn.delete('simple_reception');
+      await txn.delete('simple_order_items');
+      await txn.delete('simple_orders');
+    });
   }
 }

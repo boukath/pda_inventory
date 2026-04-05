@@ -55,5 +55,11 @@
   "receivingLogTitle": "سجل الاستلام",
   "readyToReceiveHint": "جاهز للاستلام.\nامسح منتجًا للبدء.",
   "supplierPrefix": "المورد: ",
-  "supplierNone": "لا يوجد"
+  "supplierNone": "لا يوجد",
+  "finalizeAndSaveOrder": "إنهاء وحفظ الطلب",
+  "orderSavedSuccess": "تم حفظ الطلب بنجاح!",
+  "noOrdersFound": "لم يتم العثور على طلبات.\nقم بحفظ جلسة جرد أولاً!",
+  "qty": "الكمية",
+  "manualEntryTitle": "إدخال يدوي",
+  "date": "التاريخ"
 }
