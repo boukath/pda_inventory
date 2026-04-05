@@ -6,7 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart'; // <-- Needed to intercept hardware scanner keys!
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-
+import 'simple_reception_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/locale_provider.dart';
 import '../database/simple_db_helper.dart'; // <-- Needed to save scans from the dashboard
@@ -220,11 +220,14 @@ class _SimpleHomeScreenState extends State<SimpleHomeScreen> {
                           ),
                           _buildGlassCard(
                             context: context,
-                            title: loc.reception,
+                            title: loc.reception, // Uses your localized string
                             icon: CupertinoIcons.tray_arrow_down,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.comingSoon)));
-                              _focusNode.requestFocus(); // Re-request focus after tapping
+                              // REMOVE the SnackBar and add this navigation:
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const SimpleReceptionScreen())
+                              ).then((_) => _focusNode.requestFocus()); // Keep this so it can scan when you return
                             },
                           ),
                           _buildGlassCard(

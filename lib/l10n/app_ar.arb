@@ -48,5 +48,12 @@
   "incorrectPin": "الرمز غير صحيح",
   "scannedItem": "تم مسح: ",
   "toggleCount": "العد (+1)",
-  "toggleCheck": "تحقق (معلومات)"
+  "toggleCheck": "تحقق (معلومات)",
+  "receiveProductTitle": "استلام منتج",
+  "quantityReceived": "الكمية المستلمة",
+  "supplierComment": "المورد / تعليق",
+  "receivingLogTitle": "سجل الاستلام",
+  "readyToReceiveHint": "جاهز للاستلام.\nامسح منتجًا للبدء.",
+  "supplierPrefix": "المورد: ",
+  "supplierNone": "لا يوجد"
 }

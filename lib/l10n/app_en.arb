@@ -48,5 +48,12 @@
   "incorrectPin": "Incorrect PIN",
   "scannedItem": "Scanned: ",
   "toggleCount": "COUNT (+1)",
-  "toggleCheck": "CHECK (INFO)"
+  "toggleCheck": "CHECK (INFO)",
+  "receiveProductTitle": "Receive Product",
+  "quantityReceived": "Quantity Received",
+  "supplierComment": "Supplier / Comment",
+  "receivingLogTitle": "Receiving Log",
+  "readyToReceiveHint": "Ready to receive.\nScan a product to begin.",
+  "supplierPrefix": "Supplier: ",
+  "supplierNone": "None"
 }

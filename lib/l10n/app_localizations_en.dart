@@ -158,4 +158,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toggleCheck => 'CHECK (INFO)';
+
+  @override
+  String get receiveProductTitle => 'Receive Product';
+
+  @override
+  String get quantityReceived => 'Quantity Received';
+
+  @override
+  String get supplierComment => 'Supplier / Comment';
+
+  @override
+  String get receivingLogTitle => 'Receiving Log';
+
+  @override
+  String get readyToReceiveHint =>
+      'Ready to receive.\nScan a product to begin.';
+
+  @override
+  String get supplierPrefix => 'Supplier: ';
+
+  @override
+  String get supplierNone => 'None';
 }

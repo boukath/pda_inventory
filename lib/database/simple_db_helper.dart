@@ -21,22 +21,53 @@ class SimpleDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1, // Starting fresh at version 1
+      version: 2, // <-- 1. Bumped version to 2 for the Reception update
       onCreate: _createDB,
+      onUpgrade: _upgradeDB, // <-- 2. Added upgrade script to safely add the new table
     );
   }
 
   Future _createDB(Database db, int version) async {
-    // A very lightweight table just for counting barcodes
+    // A very lightweight table just for counting barcodes (Inventory)
     await db.execute('''
       CREATE TABLE simple_inventory (
         barcode TEXT PRIMARY KEY,
         quantity INTEGER NOT NULL
       )
     ''');
+
+    // Create the new reception log table on fresh installs
+    await db.execute('''
+      CREATE TABLE simple_reception (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        barcode TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        comment TEXT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
   }
 
-  // --- ACTIONS ---
+  // --- NEW: UPGRADE DATABASE ---
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add reception table for existing users upgrading from v1 to v2
+      // This ensures you don't lose any of your existing simple_inventory data!
+      await db.execute('''
+        CREATE TABLE simple_reception (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          barcode TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          comment TEXT,
+          timestamp TEXT NOT NULL
+        )
+      ''');
+    }
+  }
+
+  // ==========================================
+  // --- ACTIONS FOR INVENTORY (COUNTING) ---
+  // ==========================================
 
   // Increase quantity or insert new barcode
   Future<void> scanBarcode(String barcode) async {
@@ -72,7 +103,7 @@ class SimpleDatabaseHelper {
     return await db.query('simple_inventory', orderBy: 'quantity DESC');
   }
 
-  // --- NEW METHOD TO MANUALLY EDIT QUANTITY ---
+  // Manually edit quantity
   Future<void> updateQuantity(String barcode, int newQuantity) async {
     final db = await instance.database;
 
@@ -88,5 +119,28 @@ class SimpleDatabaseHelper {
         whereArgs: [barcode],
       );
     }
+  }
+
+  // ==========================================
+  // --- ACTIONS FOR RECEPTION (LOGGING) ---
+  // ==========================================
+
+  // 1. Save a new reception log from a supplier
+  Future<void> saveReceptionLog(String barcode, int quantity, String comment) async {
+    final db = await instance.database;
+    await db.insert('simple_reception', {
+      'barcode': barcode,
+      'quantity': quantity,
+      'comment': comment,
+      // Automatically generate the exact date and time
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // 2. Get history of received items to display on the Reception Screen
+  Future<List<Map<String, dynamic>>> getReceptionHistory() async {
+    final db = await instance.database;
+    // Show the newest scans at the top of the list
+    return await db.query('simple_reception', orderBy: 'timestamp DESC');
   }
 }

@@ -159,4 +159,26 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toggleCheck => 'VÉRIFIER (INFO)';
+
+  @override
+  String get receiveProductTitle => 'Recevoir un produit';
+
+  @override
+  String get quantityReceived => 'Quantité reçue';
+
+  @override
+  String get supplierComment => 'Fournisseur / Commentaire';
+
+  @override
+  String get receivingLogTitle => 'Journal de réception';
+
+  @override
+  String get readyToReceiveHint =>
+      'Prêt à recevoir.\nScannez un produit pour commencer.';
+
+  @override
+  String get supplierPrefix => 'Fournisseur : ';
+
+  @override
+  String get supplierNone => 'Aucun';
 }

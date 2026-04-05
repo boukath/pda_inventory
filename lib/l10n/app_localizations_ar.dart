@@ -157,4 +157,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get toggleCheck => 'تحقق (معلومات)';
+
+  @override
+  String get receiveProductTitle => 'استلام منتج';
+
+  @override
+  String get quantityReceived => 'الكمية المستلمة';
+
+  @override
+  String get supplierComment => 'المورد / تعليق';
+
+  @override
+  String get receivingLogTitle => 'سجل الاستلام';
+
+  @override
+  String get readyToReceiveHint => 'جاهز للاستلام.\nامسح منتجًا للبدء.';
+
+  @override
+  String get supplierPrefix => 'المورد: ';
+
+  @override
+  String get supplierNone => 'لا يوجد';
 }

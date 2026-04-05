@@ -48,5 +48,12 @@
   "incorrectPin": "Code PIN incorrect",
   "scannedItem": "Scanné : ",
   "toggleCount": "COMPTER (+1)",
-  "toggleCheck": "VÉRIFIER (INFO)"
+  "toggleCheck": "VÉRIFIER (INFO)",
+  "receiveProductTitle": "Recevoir un produit",
+  "quantityReceived": "Quantité reçue",
+  "supplierComment": "Fournisseur / Commentaire",
+  "receivingLogTitle": "Journal de réception",
+  "readyToReceiveHint": "Prêt à recevoir.\nScannez un produit pour commencer.",
+  "supplierPrefix": "Fournisseur : ",
+  "supplierNone": "Aucun"
 }

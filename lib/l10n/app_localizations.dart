@@ -399,6 +399,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'CHECK (INFO)'**
   String get toggleCheck;
+
+  /// No description provided for @receiveProductTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive Product'**
+  String get receiveProductTitle;
+
+  /// No description provided for @quantityReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity Received'**
+  String get quantityReceived;
+
+  /// No description provided for @supplierComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier / Comment'**
+  String get supplierComment;
+
+  /// No description provided for @receivingLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving Log'**
+  String get receivingLogTitle;
+
+  /// No description provided for @readyToReceiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to receive.\nScan a product to begin.'**
+  String get readyToReceiveHint;
+
+  /// No description provided for @supplierPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier: '**
+  String get supplierPrefix;
+
+  /// No description provided for @supplierNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get supplierNone;
 }
 
 class _AppLocalizationsDelegate
