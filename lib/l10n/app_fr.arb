@@ -46,5 +46,7 @@
   "unlock": "Déverrouiller",
   "cancel": "Annuler",
   "incorrectPin": "Code PIN incorrect",
-  "scannedItem": "Scanné : "
+  "scannedItem": "Scanné : ",
+  "toggleCount": "COMPTER (+1)",
+  "toggleCheck": "VÉRIFIER (INFO)"
 }

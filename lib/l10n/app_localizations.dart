@@ -387,6 +387,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scanned: '**
   String get scannedItem;
+
+  /// No description provided for @toggleCount.
+  ///
+  /// In en, this message translates to:
+  /// **'COUNT (+1)'**
+  String get toggleCount;
+
+  /// No description provided for @toggleCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'CHECK (INFO)'**
+  String get toggleCheck;
 }
 
 class _AppLocalizationsDelegate

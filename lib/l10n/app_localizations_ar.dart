@@ -151,4 +151,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get scannedItem => 'تم مسح: ';
+
+  @override
+  String get toggleCount => 'العد (+1)';
+
+  @override
+  String get toggleCheck => 'تحقق (معلومات)';
 }

@@ -153,4 +153,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get scannedItem => 'Scanné : ';
+
+  @override
+  String get toggleCount => 'COMPTER (+1)';
+
+  @override
+  String get toggleCheck => 'VÉRIFIER (INFO)';
 }

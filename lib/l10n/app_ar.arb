@@ -46,5 +46,7 @@
   "unlock": "فتح",
   "cancel": "إلغاء",
   "incorrectPin": "الرمز غير صحيح",
-  "scannedItem": "تم مسح: "
+  "scannedItem": "تم مسح: ",
+  "toggleCount": "العد (+1)",
+  "toggleCheck": "تحقق (معلومات)"
 }

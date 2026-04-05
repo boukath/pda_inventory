@@ -46,5 +46,7 @@
   "unlock": "Unlock",
   "cancel": "Cancel",
   "incorrectPin": "Incorrect PIN",
-  "scannedItem": "Scanned: "
+  "scannedItem": "Scanned: ",
+  "toggleCount": "COUNT (+1)",
+  "toggleCheck": "CHECK (INFO)"
 }

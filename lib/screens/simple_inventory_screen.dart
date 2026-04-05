@@ -22,6 +22,10 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
 
   List<Map<String, dynamic>> _scannedItems = [];
 
+  // --- NEW: THE MODE TOGGLE VARIABLE ---
+  // true = Count Mode (+1 to DB), false = Check Mode (Read Only)
+  bool _isCountMode = true;
+
   @override
   void initState() {
     super.initState();
@@ -44,37 +48,115 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
     });
   }
 
+  // --- UPDATED: SCAN PROCESSOR ---
   Future<void> _processScannedBarcode(String barcode) async {
     if (barcode.isEmpty) return;
 
-    final loc = AppLocalizations.of(context)!;
+    if (_isCountMode) {
+      // MODE A: COUNT MODE (+1)
+      final loc = AppLocalizations.of(context)!;
 
-    // Save to local SQLite
-    await SimpleDatabaseHelper.instance.scanBarcode(barcode);
-    await _loadData();
+      await SimpleDatabaseHelper.instance.scanBarcode(barcode);
+      await _loadData();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("${loc.scannedItem}$barcode", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        duration: const Duration(milliseconds: 500),
-        backgroundColor: Colors.green,
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("${loc.scannedItem}$barcode", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          duration: const Duration(milliseconds: 500),
+          backgroundColor: Colors.green.shade600, // Strong success color
+        ),
+      );
 
-    // Re-request focus just in case the SnackBar stole it!
-    _focusNode.requestFocus();
+      _focusNode.requestFocus();
+
+    } else {
+      // MODE B: CHECK MODE (READ ONLY)
+      // Look for the item in our current memory list
+      final existingItemIndex = _scannedItems.indexWhere((item) => item['barcode'].toString() == barcode);
+
+      int currentQty = 0;
+      if (existingItemIndex != -1) {
+        currentQty = _scannedItems[existingItemIndex]['quantity'] as int;
+      }
+
+      if (!mounted) return;
+
+      // Show the massive check dialog
+      _showCheckModeDialog(barcode, currentQty);
+    }
   }
 
-  // --- NEW: EDIT QUANTITY DIALOG ---
+  // --- NEW: CHECK MODE DIALOG ---
+  // A large, highly visible popup for checking items without modifying the database.
+  void _showCheckModeDialog(String barcode, int currentQty) {
+    showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: Colors.orange.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: BorderSide(color: Colors.orange.shade700, width: 4),
+            ),
+            title: Center(
+              child: Text("INFO CHECK", style: GoogleFonts.poppins(fontWeight: FontWeight.w900, color: Colors.orange.shade900, fontSize: 24)),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.qr_code_scanner, size: 60, color: Colors.orange),
+                const SizedBox(height: 16),
+                Text(barcode, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                  ),
+                  child: Column(
+                    children: [
+                      Text("Scanned Quantity", style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 14)),
+                      Text(
+                          currentQty.toString(),
+                          style: GoogleFonts.poppins(fontSize: 48, fontWeight: FontWeight.w900, color: currentQty == 0 ? Colors.red : Colors.green)
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade700, foregroundColor: Colors.white),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _focusNode.requestFocus(); // Give scanner focus back!
+                  },
+                  child: Text("OK", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
+                ),
+              ),
+            ],
+          );
+        }
+    ).then((_) => _focusNode.requestFocus());
+  }
+
+  // --- EDIT QUANTITY DIALOG ---
   Future<void> _showEditQuantityDialog(String barcode, int currentQty) async {
     final TextEditingController qtyController = TextEditingController(text: currentQty.toString());
     final loc = AppLocalizations.of(context)!;
 
     await showDialog(
         context: context,
-        barrierDismissible: false, // Force them to press save or cancel
+        barrierDismissible: false,
         builder: (context) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -82,7 +164,6 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
             content: TextField(
               controller: qtyController,
               keyboardType: TextInputType.number,
-              // Force keyboard to only accept numbers
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 labelText: "New Quantity (0 to delete)",
@@ -98,14 +179,12 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A00E0), foregroundColor: Colors.white),
                 onPressed: () async {
-                  // Parse the new number they typed
                   int? newQty = int.tryParse(qtyController.text);
                   if (newQty != null) {
-                    // Call our new database method
                     await SimpleDatabaseHelper.instance.updateQuantity(barcode, newQty);
-                    await _loadData(); // Refresh the screen
+                    await _loadData();
                     if (context.mounted) {
-                      Navigator.pop(context); // Close dialog
+                      Navigator.pop(context);
                     }
                   }
                 },
@@ -116,13 +195,92 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
         }
     );
 
-    // IMPORTANT: Re-request focus after dialog closes so the scanner works again!
     _focusNode.requestFocus();
+  }
+
+  // --- UPDATED: THE GIANT TOGGLE WIDGET ---
+  Widget _buildGiantToggle() {
+    // 1. Get the localizations!
+    final loc = AppLocalizations.of(context)!;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          // COUNT MODE BUTTON
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _isCountMode = true);
+                _focusNode.requestFocus();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                decoration: BoxDecoration(
+                  color: _isCountMode ? const Color(0xFF4A00E0) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: _isCountMode
+                      ? [BoxShadow(color: const Color(0xFF4A00E0).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]
+                      : [],
+                ),
+                child: Center(
+                  child: Text(
+                    loc.toggleCount, // <-- CHANGED HERE
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: _isCountMode ? Colors.white : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // CHECK MODE BUTTON
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _isCountMode = false);
+                _focusNode.requestFocus();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                decoration: BoxDecoration(
+                  color: !_isCountMode ? Colors.orange.shade600 : Colors.transparent,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: !_isCountMode
+                      ? [BoxShadow(color: Colors.orange.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))]
+                      : [],
+                ),
+                child: Center(
+                  child: Text(
+                    loc.toggleCheck, // <-- CHANGED HERE
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: !_isCountMode ? Colors.white : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+
+    // The current active color theme for the app bar
+    final Color activeThemeColor = _isCountMode ? const Color(0xFF4A00E0) : Colors.orange.shade700;
 
     return Focus(
       focusNode: _focusNode,
@@ -145,7 +303,6 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
         }
         return KeyEventResult.ignored;
       },
-      // THE PDA KEEPALIVE WRAPPER
       child: GestureDetector(
         onTap: () {
           if (!_focusNode.hasFocus) {
@@ -156,50 +313,60 @@ class _SimpleInventoryScreenState extends State<SimpleInventoryScreen> {
         child: Scaffold(
           appBar: AppBar(
             title: Text(loc.inventory, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-            backgroundColor: const Color(0xFF4A00E0),
+            // Animate the app bar color so the user knows immediately what mode they are in
+            backgroundColor: activeThemeColor,
             iconTheme: const IconThemeData(color: Colors.white),
           ),
-          body: _scannedItems.isEmpty
-              ? Center(
-            child: Text(
-                loc.readyToScan,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey)
-            ),
-          )
-              : ListView.builder(
-            itemCount: _scannedItems.length,
-            itemBuilder: (context, index) {
-              final item = _scannedItems[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.qr_code, color: Color(0xFF4A00E0)),
-                  title: Text(item['barcode'].toString(), style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                  // --- NEW: TAPPABLE QUANTITY BADGE ---
-                  trailing: InkWell(
-                    onTap: () => _showEditQuantityDialog(item['barcode'].toString(), item['quantity'] as int),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFF4A00E0).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF4A00E0).withOpacity(0.3))
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("x ${item['quantity']}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF4A00E0))),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.edit, size: 16, color: Color(0xFF4A00E0)), // Visual cue that it's editable!
-                        ],
-                      ),
-                    ),
+          body: Column(
+            children: [
+              // 1. Render the new Toggle UI at the top
+              _buildGiantToggle(),
+
+              // 2. Render the List View (or empty state)
+              Expanded(
+                child: _scannedItems.isEmpty
+                    ? Center(
+                  child: Text(
+                      loc.readyToScan,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey)
                   ),
+                )
+                    : ListView.builder(
+                  itemCount: _scannedItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _scannedItems[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        leading: Icon(Icons.qr_code, color: activeThemeColor),
+                        title: Text(item['barcode'].toString(), style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                        trailing: InkWell(
+                          onTap: () => _showEditQuantityDialog(item['barcode'].toString(), item['quantity'] as int),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                                color: activeThemeColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: activeThemeColor.withOpacity(0.3))
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text("x ${item['quantity']}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: activeThemeColor)),
+                                const SizedBox(width: 8),
+                                Icon(Icons.edit, size: 16, color: activeThemeColor),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),

@@ -152,4 +152,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scannedItem => 'Scanned: ';
+
+  @override
+  String get toggleCount => 'COUNT (+1)';
+
+  @override
+  String get toggleCheck => 'CHECK (INFO)';
 }

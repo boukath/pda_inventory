@@ -65,7 +65,7 @@ class SimpleDatabaseHelper {
       });
     }
   }
--
+
   // Read all scanned items to show on the screen
   Future<List<Map<String, dynamic>>> getScannedItems() async {
     final db = await instance.database;
