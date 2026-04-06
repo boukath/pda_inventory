@@ -42,3 +42,10 @@ android {
 flutter {
     source = "../.."
 }
+
+// --- NEW DEPENDENCIES BLOCK ---
+dependencies {
+    // This tells Android to include the bluebird-sled.jar (and any other .jar)
+    // that you placed in the android/app/libs folder.
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+}

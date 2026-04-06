@@ -1,10 +1,10 @@
 // File: lib/screens/rfid_screen.dart
 
 import 'dart:ui';
-import 'dart:async'; // <-- NEW: Required for StreamSubscription
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart'; // <-- Required for EventChannel
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../database/db_helper.dart';
@@ -20,39 +20,37 @@ class RfidScreen extends StatefulWidget {
 }
 
 class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateMixin {
-  // --- NEW: Native Android Intent Channel ---
-  static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid');
+  static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid_events');
+
+  // --- NEW: MethodChannel to talk TO the gun ---
+  static const MethodChannel _methodChannel = MethodChannel('com.pda_inventory/rfid_methods');
+
   StreamSubscription? _rfidSubscription;
 
   final Set<String> _uniquePhysicalTags = {};
   final Map<String, Product?> _productCache = {};
   final Map<String, int> _inventoryCounts = {};
 
-  bool _isScanning = false; // Start paused so they can prepare
+  bool _isScanning = true; // Enabled by default
 
-  // Audio & Animation for the "Zara" feel
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-    // Setup the radar pulse animation
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: false); // Loops continuously
+    )..repeat(reverse: false);
 
     _audioPlayer.setVolume(1.0);
-
-    // Start listening to the Native Kotlin Bridge instantly
     _startListeningToHardware();
   }
 
-  // --- NEW: Hardware Listener ---
   void _startListeningToHardware() {
     _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
-      if (!_isScanning) return; // Ignore tags if scanning is paused
+      if (!_isScanning) return;
 
       String scannedTag = event.toString().trim();
       if (scannedTag.isNotEmpty) {
@@ -65,22 +63,17 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    _rfidSubscription?.cancel(); // Close the tunnel when leaving screen!
+    _rfidSubscription?.cancel();
     _pulseController.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }
 
   Future<void> _processScannedTag(String tag) async {
-    // If we already saw this exact physical tag, do nothing (ignore duplicates)
     if (_uniquePhysicalTags.contains(tag)) return;
 
-    // --- NEW TAG FOUND! ---
     _uniquePhysicalTags.add(tag);
     _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
-
-    // Play a short, satisfying "beep" for every new item
-    // _audioPlayer.play(AssetSource('beep.mp3'));
 
     setState(() {});
 
@@ -110,7 +103,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   }
 
   void _finishSession() {
-    // Stop the scanner from picking up rogue tags while navigating
     setState(() {
       _isScanning = false;
     });
@@ -122,16 +114,13 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
           content: Text("${AppLocalizations.of(context)!.scannedItems}: ${_uniquePhysicalTags.length}\n\n${AppLocalizations.of(context)!.readyToReview}"),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               child: Text(AppLocalizations.of(context)!.cancel),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A00E0)),
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                // Navigate to the Review Screen and pass the scanned data
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -140,10 +129,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                       productCache: _productCache,
                     ),
                   ),
-                ).then((_) {
-                  // When they pop back from the Review screen, clear the session to start fresh!
-                  _clearSession();
-                });
+                ).then((_) => _clearSession());
               },
               child: Text(AppLocalizations.of(context)!.reviewItems, style: const TextStyle(color: Colors.white)),
             )
@@ -162,10 +148,19 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      // --- REMOVED FOCUS WIDGET: We don't need a keyboard anymore! ---
+      // --- NEW: TEMPORARY TEST BUTTON ---
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          // Manually trigger the inventory command on the gun
+          _methodChannel.invokeMethod('startScan');
+        },
+        backgroundColor: Colors.orange,
+        icon: const Icon(CupertinoIcons.bolt_fill, color: Colors.white),
+        label: const Text("TEST SCAN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
       body: Column(
         children: [
-          // --- THE ZARA RADAR UI ---
+          // Radar UI section remains unchanged
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(top: 20, bottom: 40),
@@ -185,14 +180,11 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 80, fontWeight: FontWeight.bold, height: 1),
                 ),
                 const SizedBox(height: 30),
-
-                // The Interactive Radar Button
                 GestureDetector(
                   onTap: _toggleScanning,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Animated Pulse Effect
                       if (_isScanning)
                         AnimatedBuilder(
                           animation: _pulseController,
@@ -210,20 +202,12 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                             );
                           },
                         ),
-                      // Main Play/Pause Button
                       Container(
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
-                            color: _isScanning ? Colors.greenAccent : Colors.redAccent,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isScanning ? Colors.greenAccent : Colors.redAccent).withOpacity(0.4),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              )
-                            ]
+                          color: _isScanning ? Colors.greenAccent : Colors.redAccent,
+                          shape: BoxShape.circle,
                         ),
                         child: Icon(
                           _isScanning ? CupertinoIcons.pause_solid : CupertinoIcons.play_arrow_solid,
@@ -242,8 +226,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
-
-          // --- LIST OF ITEMS ---
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -252,9 +234,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                 String tag = _inventoryCounts.keys.elementAt(index);
                 int count = _inventoryCounts[tag]!;
                 Product? product = _productCache[tag];
-
                 bool isUnknown = product == null;
-
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -265,7 +245,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                     ),
                     title: Text(
                       isUnknown ? AppLocalizations.of(context)!.unknownTag : product.name,
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045)),
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(tag, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                     trailing: Text('x$count', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18, color: const Color(0xFF4A00E0))),
@@ -276,14 +256,9 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-
-      // --- BOTTOM ACTION BAR ---
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-        ),
+        decoration: BoxDecoration(color: Colors.white),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4A00E0),
@@ -291,10 +266,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onPressed: _uniquePhysicalTags.isEmpty ? null : _finishSession,
-          child: Text(
-            AppLocalizations.of(context)!.finishAndReview,
-            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
-          ),
+          child: Text(AppLocalizations.of(context)!.finishAndReview, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
       ),
     );
