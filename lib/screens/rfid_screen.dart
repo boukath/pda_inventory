@@ -21,8 +21,6 @@ class RfidScreen extends StatefulWidget {
 
 class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateMixin {
   static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid_events');
-
-  // --- NEW: MethodChannel to talk TO the gun ---
   static const MethodChannel _methodChannel = MethodChannel('com.pda_inventory/rfid_methods');
 
   StreamSubscription? _rfidSubscription;
@@ -31,7 +29,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   final Map<String, Product?> _productCache = {};
   final Map<String, int> _inventoryCounts = {};
 
-  bool _isScanning = true; // Enabled by default
+  // Start with scanning paused so the user has to initiate it
+  bool _isScanning = false;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
@@ -50,11 +49,25 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
   void _startListeningToHardware() {
     _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
-      if (!_isScanning) return;
+      String data = event.toString().trim();
 
-      String scannedTag = event.toString().trim();
-      if (scannedTag.isNotEmpty) {
-        _processScannedTag(scannedTag);
+      // 1. Listen for hardware trigger status to animate UI
+      if (data == 'STATUS:START') {
+        if (mounted) setState(() => _isScanning = true);
+        return;
+      } else if (data == 'STATUS:STOP') {
+        if (mounted) setState(() => _isScanning = false);
+        return;
+      }
+
+      // 2. Listen for actual scanned tags
+      if (data.startsWith('TAG:')) {
+        if (!_isScanning) return; // Prevent ghost scans if UI is paused
+
+        String scannedTag = data.replaceAll('TAG:', '');
+        if (scannedTag.isNotEmpty) {
+          _processScannedTag(scannedTag);
+        }
       }
     }, onError: (dynamic error) {
       debugPrint('RFID Stream Error: ${error.message}');
@@ -63,6 +76,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    // Ensure the hardware stops scanning if the user leaves the screen
+    _methodChannel.invokeMethod('stopScan');
     _rfidSubscription?.cancel();
     _pulseController.dispose();
     _audioPlayer.dispose();
@@ -87,10 +102,18 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     }
   }
 
+  // --- UPDATED: The on-screen software trigger ---
   void _toggleScanning() {
     setState(() {
       _isScanning = !_isScanning;
     });
+
+    // Tell the Kotlin backend to start or stop the hardware
+    if (_isScanning) {
+      _methodChannel.invokeMethod('startScan');
+    } else {
+      _methodChannel.invokeMethod('stopScan');
+    }
   }
 
   void _clearSession() {
@@ -106,6 +129,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     setState(() {
       _isScanning = false;
     });
+    // Stop the physical gun when finishing session
+    _methodChannel.invokeMethod('stopScan');
 
     showDialog(
         context: context,
@@ -148,19 +173,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      // --- NEW: TEMPORARY TEST BUTTON ---
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // Manually trigger the inventory command on the gun
-          _methodChannel.invokeMethod('startScan');
-        },
-        backgroundColor: Colors.orange,
-        icon: const Icon(CupertinoIcons.bolt_fill, color: Colors.white),
-        label: const Text("TEST SCAN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
       body: Column(
         children: [
-          // Radar UI section remains unchanged
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(top: 20, bottom: 40),
@@ -180,6 +194,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                   style: GoogleFonts.poppins(color: Colors.white, fontSize: 80, fontWeight: FontWeight.bold, height: 1),
                 ),
                 const SizedBox(height: 30),
+
+                // --- THE SOFTWARE TRIGGER BUTTON ---
                 GestureDetector(
                   onTap: _toggleScanning,
                   child: Stack(
@@ -258,7 +274,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white),
+        decoration: const BoxDecoration(color: Colors.white),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4A00E0),

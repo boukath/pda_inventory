@@ -5,8 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.util.Log
-import android.view.KeyEvent
-import android.content.Intent // Required for sending system intents
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -25,23 +23,31 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL_NAME).setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    Log.d("RFID_DEBUG", "Dart started listening to EventChannel")
                     eventSink = events
                 }
                 override fun onCancel(arguments: Any?) {
+                    Log.d("RFID_DEBUG", "Dart stopped listening to EventChannel")
                     eventSink = null
                 }
             }
         )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL_NAME).setMethodCallHandler { call, result ->
-            if (call.method == "startScan") {
-                startInventory()
-                result.success(null)
-            } else {
-                result.notImplemented()
+            when (call.method) {
+                "startScan" -> {
+                    startInventory()
+                    result.success(null)
+                }
+                "stopScan" -> {
+                    stopInventory()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
             }
         }
     }
@@ -56,107 +62,87 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    // --- NEW: Force the System Barcode Scanner to STOP ---
-    private fun stopSystemBarcode() {
-        try {
-            // Bluebird HF550 standard stop intent
-            val stopIntent = Intent("kr.co.bluebird.android.bbapi.action.BARCODE_SET_ENABLE")
-            stopIntent.putExtra("EXTRA_ENABLE", false)
-            sendBroadcast(stopIntent)
-
-            // Second intent for older Bluebird models
-            val stopIntent2 = Intent("com.bluebird.barcode.action.STOP")
-            sendBroadcast(stopIntent2)
-
-            Log.d("RFID_DEBUG", "Sent System Barcode STOP command")
-        } catch (e: Exception) {
-            Log.e("RFID_DEBUG", "Failed to send stop intent", e)
-        }
-    }
-
     override fun onResume() {
         super.onResume()
-
-        // 1. Kill the barcode scanner first
-        stopSystemBarcode()
-
-        // 2. Clear any stale connection
+        // Close stale ports before opening
         mReader?.SD_Close()
 
-        // 3. Wait 1 second for the port to actually unlock
         Handler(Looper.getMainLooper()).postDelayed({
             val result = mReader?.SD_Open()
             if (result == true) {
                 Log.d("RFID_DEBUG", "✅ Sled Opened Successfully")
+                // CRITICAL: Tells the sled to map its physical gun trigger to RFID scanning
                 mReader?.SD_SetTriggerMode(SDConsts.SDTriggerMode.RFID)
                 mReader?.SD_Wakeup()
             } else {
-                Log.e("RFID_DEBUG", "❌ Sled Open Failed (-32). Port is still locked by the OS.")
+                Log.e("RFID_DEBUG", "❌ Sled Open Failed.")
             }
-        }, 1000)
+        }, 500)
     }
 
     override fun onPause() {
         mReader?.SD_Close()
-
-        // Re-enable barcode scanner when exiting so other apps aren't broken
-        val startIntent = Intent("kr.co.bluebird.android.bbapi.action.BARCODE_SET_ENABLE")
-        startIntent.putExtra("EXTRA_ENABLE", true)
-        sendBroadcast(startIntent)
-
         super.onPause()
     }
 
+    // This handles the On-Screen "TEST SCAN" button
     private fun startInventory() {
         val state = mReader?.SD_GetConnectState()
         if (state != SDConsts.SDConnectState.CONNECTED) {
-            Log.e("RFID_DEBUG", "Sled is $state. Re-opening port...")
+            Log.e("RFID_DEBUG", "Port closed! Re-opening...")
             mReader?.SD_Open()
+            mReader?.SD_SetTriggerMode(SDConsts.SDTriggerMode.RFID)
             mReader?.SD_Wakeup()
-            return
-        }
 
+            Handler(Looper.getMainLooper()).postDelayed({
+                executeInventoryCommand()
+            }, 500)
+        } else {
+            mReader?.SD_Wakeup()
+            executeInventoryCommand()
+        }
+    }
+
+    private fun executeInventoryCommand() {
         try {
             val result = mReader?.RF_PerformInventory(true, true, true)
-            if (result != 0 && result != null) {
-                Log.e("RFID_DEBUG", "Inventory Command Failed: $result")
+            if (result == 0) {
+                Log.d("RFID_DEBUG", "✅ Software Scan Started!")
             } else {
-                Log.d("RFID_DEBUG", "Antenna is ACTIVE")
+                Log.e("RFID_DEBUG", "❌ Software Scan failed: $result")
             }
         } catch (e: Exception) {
-            Log.e("RFID_DEBUG", "Inventory Error", e)
+            Log.e("RFID_DEBUG", "Error", e)
         }
     }
 
     private fun stopInventory() {
+        Log.d("RFID_DEBUG", "Stopping Software Scan...")
         mReader?.RF_StopInventory()
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (event?.repeatCount == 0 && (keyCode == 280 || keyCode == 293)) {
-            startInventory()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == 280 || keyCode == 293) {
-            stopInventory()
-            return true
-        }
-        return super.onKeyUp(keyCode, event)
-    }
-
+    // Central Data and Status Handler
     private val sledHandler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
+                // 1. Tags coming in from the antenna
                 SDConsts.Msg.RFMsg -> {
-                    val rawData = msg.obj as? String
+                    val rawData = msg.obj?.toString()
                     if (!rawData.isNullOrEmpty()) {
                         val parts = rawData.split(";")
                         val epc = if (parts.size >= 2) parts[1] else parts[0]
-                        eventSink?.success(epc.trim())
+                        // Prefixing with "TAG:" so Flutter knows it's an EPC
+                        eventSink?.success("TAG:${epc.trim()}")
+                    }
+                }
+                // 2. Hardware Trigger status updates
+                SDConsts.Msg.SDMsg -> {
+                    if (msg.arg1 == SDConsts.SDCmdMsg.TRIGGER_PRESSED) {
+                        Log.d("RFID_DEBUG", "🔫 Physical Trigger PULLED")
+                        eventSink?.success("STATUS:START")
+                    } else if (msg.arg1 == SDConsts.SDCmdMsg.TRIGGER_RELEASED) {
+                        Log.d("RFID_DEBUG", "🔫 Physical Trigger RELEASED")
+                        eventSink?.success("STATUS:STOP")
                     }
                 }
             }
