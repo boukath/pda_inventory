@@ -1,3 +1,5 @@
+// File: lib/models/product.dart
+
 class Product {
   final int? id;
   final String barcode;
@@ -18,6 +20,30 @@ class Product {
     this.stock = 0,
     required this.lastUpdated,
   });
+
+  // --- NEW: copyWith method for RFID inventory updates ---
+  Product copyWith({
+    int? id,
+    String? barcode,
+    String? name,
+    double? price,
+    double? costPrice,
+    String? category,
+    int? stock,
+    String? lastUpdated,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      barcode: barcode ?? this.barcode,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
+      category: category ?? this.category,
+      stock: stock ?? this.stock,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+    );
+  }
+  // -----------------------------------------------------
 
   Map<String, dynamic> toMap() {
     return {

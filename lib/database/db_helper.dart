@@ -1,3 +1,5 @@
+// File: lib/database/db_helper.dart
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/product.dart';
@@ -84,6 +86,14 @@ class DatabaseHelper {
     final result = await db.query('products', orderBy: 'name ASC');
     return result.map((json) => Product.fromMap(json)).toList();
   }
+
+  // --- NEW: FETCH ALL PRODUCTS FOR RECONCILIATION ---
+  Future<List<Product>> getProducts() async {
+    final db = await instance.database;
+    final result = await db.query('products');
+    return result.map((json) => Product.fromMap(json)).toList();
+  }
+  // --------------------------------------------------
 
   // 3. Find a product by its barcode (Crucial for the PDA scanner!)
   Future<Product?> getProductByBarcode(String barcode) async {

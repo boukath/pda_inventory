@@ -200,4 +200,64 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get date => 'Date';
+
+  @override
+  String get rfidScanner => 'Scanner RFID';
+
+  @override
+  String get rfidSweep => 'Balayage RFID';
+
+  @override
+  String get clearScans => 'Effacer les scans';
+
+  @override
+  String get scannedItems => 'ARTICLES SCANNÉS';
+
+  @override
+  String get scanningActive => 'SCAN ACTIF... MARCHEZ';
+
+  @override
+  String get pressToStartScanning => 'APPUYEZ POUR SCANNER';
+
+  @override
+  String get unknownTag => 'Tag Inconnu';
+
+  @override
+  String get finishAndReview => 'TERMINER ET VÉRIFIER';
+
+  @override
+  String get sessionComplete => 'Session Terminée';
+
+  @override
+  String get reviewItems => 'Vérifier les articles';
+
+  @override
+  String get readyToReview => 'Prêt à vérifier et sauvegarder ?';
+
+  @override
+  String get reconciliation => 'Réconciliation';
+
+  @override
+  String get commitInventory => 'VALIDER L\'INVENTAIRE';
+
+  @override
+  String get match => 'Correct';
+
+  @override
+  String get missing => 'Manquant';
+
+  @override
+  String get overstock => 'Excédent';
+
+  @override
+  String get unknown => 'Inconnu';
+
+  @override
+  String get expected => 'Attendu : ';
+
+  @override
+  String get found => 'Trouvé : ';
+
+  @override
+  String get inventoryUpdatedSuccess => 'Inventaire mis à jour avec succès !';
 }

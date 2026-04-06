@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart'; // <-- Added to save the CSV temporarily
 import 'package:share_plus/share_plus.dart'; // <-- Added to share via WhatsApp/Email
+import 'package:shared_preferences/shared_preferences.dart'; // <-- NEW: Added to save checkmarks permanently!
 
 import '../database/simple_db_helper.dart';
 import '../l10n/app_localizations.dart';
@@ -17,17 +18,48 @@ class SimpleOrdersScreen extends StatefulWidget {
 
 class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
   List<Map<String, dynamic>> _orders = [];
+  SharedPreferences? _prefs; // <-- We will store the local memory instance here
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    _initAndLoad(); // <-- Changed to initialize preferences first!
+  }
+
+  // --- NEW: Initialize SharedPreferences BEFORE loading the orders ---
+  Future<void> _initAndLoad() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _loadOrders();
   }
 
   Future<void> _loadOrders() async {
     final data = await SimpleDatabaseHelper.instance.getOrdersWithItems();
+
+    // Make data modifiable so we can track Checkbox state
+    final List<Map<String, dynamic>> modifiableData = data.map((orderData) {
+      final order = Map<String, dynamic>.from(orderData['order']);
+      final orderId = order['id']; // Get the unique ID for this order
+
+      final items = (orderData['items'] as List).map((item) {
+        final modifiableItem = Map<String, dynamic>.from(item);
+        final barcode = modifiableItem['barcode'];
+
+        // --- NEW: Ask SharedPreferences if this specific barcode was checked in this specific order ---
+        // If it doesn't exist yet, it defaults to false.
+        final bool savedState = _prefs?.getBool('check_${orderId}_$barcode') ?? false;
+
+        modifiableItem['isChecked'] = savedState;
+        return modifiableItem;
+      }).toList();
+
+      return {
+        'order': order,
+        'items': items,
+      };
+    }).toList();
+
     setState(() {
-      _orders = data;
+      _orders = modifiableData;
     });
   }
 
@@ -36,13 +68,13 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
     return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
   }
 
-  // --- NEW: EXPORT AND SHARE METHOD ---
+  // --- EXPORT AND SHARE METHOD ---
   Future<void> _exportAndShareCSV() async {
     if (_orders.isEmpty) return;
 
     final loc = AppLocalizations.of(context)!;
 
-    // 1. Show a loading indicator (optional, but good UX)
+    // 1. Show a loading indicator
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.exporting), duration: const Duration(seconds: 1)),
     );
@@ -61,7 +93,6 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
         final String dateStr = _formatDate(order['timestamp']);
 
         for (var item in items) {
-          // We wrap values in quotes "" to ensure special characters don't break the CSV
           csvData.writeln('"${item['barcode']}","${item['quantity']}","$dateStr"');
         }
       }
@@ -72,8 +103,7 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
       final File file = File(filePath);
       await file.writeAsString(csvData.toString());
 
-      // 4. Open the Native Share Menu (WhatsApp, Email, etc.)
-      // Note: We use existing translation loc.generateCsv for the share message!
+      // 4. Open the Native Share Menu
       await Share.shareXFiles(
         [XFile(filePath)],
         text: loc.generateCsv,
@@ -98,9 +128,8 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
         backgroundColor: const Color(0xFF1E0045),
         foregroundColor: Colors.white,
         title: Text(loc.bon, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        // --- NEW: SHARE BUTTON IN APP BAR ---
         actions: [
-          if (_orders.isNotEmpty) // Only show the share button if there is data
+          if (_orders.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.share),
               tooltip: loc.exportCsv,
@@ -131,20 +160,30 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
   }
 
   Widget _buildPremiumOrderCard(Map<String, dynamic> order, List<Map<String, dynamic>> items, AppLocalizations loc) {
+    // Check if ALL items in this specific order are checked off
+    bool allChecked = items.isNotEmpty && items.every((item) => item['isChecked'] == true);
+
     return Card(
       elevation: 6,
       shadowColor: Colors.black26,
       margin: const EdgeInsets.only(bottom: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ClipRRect(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
+        // Add a green border if the whole order is done
+        side: BorderSide(color: allChecked ? Colors.green : Colors.transparent, width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
         child: Column(
           children: [
             // --- TOP HEADER (Date & Time) ---
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF4A00E0), Color(0xFF00B4DB)],
+                  // Turn header Green if all checked, otherwise default purple/blue
+                  colors: allChecked
+                      ? [Colors.green.shade600, Colors.green.shade400]
+                      : [const Color(0xFF4A00E0), const Color(0xFF00B4DB)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -155,7 +194,7 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.event_note, color: Colors.white),
+                      Icon(allChecked ? Icons.check_circle : Icons.event_note, color: Colors.white),
                       const SizedBox(width: 10),
                       Text(
                         _formatDate(order['timestamp']),
@@ -181,8 +220,11 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
               width: double.infinity,
               child: DataTable(
                 headingRowColor: WidgetStateProperty.all(Colors.grey.shade100),
-                columnSpacing: 20,
+                columnSpacing: 10, // Reduced spacing to fit the checkbox
+                horizontalMargin: 12,
                 columns: [
+                  // New Checkbox Column header
+                  const DataColumn(label: Text('')),
                   DataColumn(
                     label: Text(loc.barcode, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045))),
                   ),
@@ -192,26 +234,76 @@ class _SimpleOrdersScreenState extends State<SimpleOrdersScreen> {
                   ),
                 ],
                 rows: items.map((item) {
+                  final isChecked = item['isChecked'] ?? false;
+
                   return DataRow(
+                    // Change row background color to very light green if checked
+                    color: WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+                      return isChecked ? Colors.green.withOpacity(0.1) : null;
+                    }),
                     cells: [
+                      // --- 1. THE CHECKBOX CELL ---
                       DataCell(
-                        Row(
-                          children: [
-                            const Icon(Icons.qr_code, size: 16, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            Text(item['barcode'].toString(), style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                          ],
+                        Checkbox(
+                          value: isChecked,
+                          activeColor: Colors.green.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: (bool? value) {
+                            final newValue = value ?? false;
+                            setState(() {
+                              item['isChecked'] = newValue;
+                            });
+                            // --- NEW: Save immediately to local device storage! ---
+                            _prefs?.setBool('check_${order['id']}_${item['barcode']}', newValue);
+                          },
                         ),
                       ),
+                      // --- 2. THE BARCODE CELL ---
+                      DataCell(
+                        GestureDetector(
+                          // Allow tapping the barcode itself to check/uncheck it easily
+                          onTap: () {
+                            final newValue = !isChecked;
+                            setState(() {
+                              item['isChecked'] = newValue;
+                            });
+                            // --- NEW: Save immediately to local device storage! ---
+                            _prefs?.setBool('check_${order['id']}_${item['barcode']}', newValue);
+                          },
+                          child: Row(
+                            children: [
+                              Icon(Icons.qr_code, size: 16, color: isChecked ? Colors.green.shade600 : Colors.grey),
+                              const SizedBox(width: 8),
+                              Text(
+                                  item['barcode'].toString(),
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    color: isChecked ? Colors.grey : Colors.black87,
+                                    // Add a strikethrough line if it is checked!
+                                    decoration: isChecked ? TextDecoration.lineThrough : null,
+                                  )
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // --- 3. THE QUANTITY CELL ---
                       DataCell(
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: isChecked ? Colors.green.withOpacity(0.2) : Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.green.withOpacity(0.3)),
                           ),
-                          child: Text("+ ${item['quantity']}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                          child: Text(
+                              "+ ${item['quantity']}",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                color: isChecked ? Colors.grey : Colors.green.shade800,
+                                decoration: isChecked ? TextDecoration.lineThrough : null,
+                              )
+                          ),
                         ),
                       ),
                     ],

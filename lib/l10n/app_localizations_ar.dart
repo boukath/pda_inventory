@@ -197,4 +197,64 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get date => 'التاريخ';
+
+  @override
+  String get rfidScanner => 'ماسح RFID';
+
+  @override
+  String get rfidSweep => 'مسح RFID';
+
+  @override
+  String get clearScans => 'مسح السجلات';
+
+  @override
+  String get scannedItems => 'العناصر الممسوحة';
+
+  @override
+  String get scanningActive => 'المسح نشط... تجول في الممر';
+
+  @override
+  String get pressToStartScanning => 'اضغط لبدء المسح';
+
+  @override
+  String get unknownTag => 'علامة غير معروفة';
+
+  @override
+  String get finishAndReview => 'إنهاء ومراجعة';
+
+  @override
+  String get sessionComplete => 'اكتملت الجلسة';
+
+  @override
+  String get reviewItems => 'مراجعة العناصر';
+
+  @override
+  String get readyToReview => 'هل أنت مستعد للمراجعة والحفظ في قاعدة البيانات؟';
+
+  @override
+  String get reconciliation => 'التسوية والمطابقة';
+
+  @override
+  String get commitInventory => 'تأكيد الجرد';
+
+  @override
+  String get match => 'متطابق';
+
+  @override
+  String get missing => 'مفقود';
+
+  @override
+  String get overstock => 'فائض';
+
+  @override
+  String get unknown => 'غير معروف';
+
+  @override
+  String get expected => 'المتوقع: ';
+
+  @override
+  String get found => 'الموجود: ';
+
+  @override
+  String get inventoryUpdatedSuccess => 'تم تحديث المخزون بنجاح!';
 }

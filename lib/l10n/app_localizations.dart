@@ -477,6 +477,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date'**
   String get date;
+
+  /// No description provided for @rfidScanner.
+  ///
+  /// In en, this message translates to:
+  /// **'RFID Scanner'**
+  String get rfidScanner;
+
+  /// No description provided for @rfidSweep.
+  ///
+  /// In en, this message translates to:
+  /// **'RFID Sweep'**
+  String get rfidSweep;
+
+  /// No description provided for @clearScans.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Scans'**
+  String get clearScans;
+
+  /// No description provided for @scannedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'SCANNED ITEMS'**
+  String get scannedItems;
+
+  /// No description provided for @scanningActive.
+  ///
+  /// In en, this message translates to:
+  /// **'SCANNING ACTIVE... WALK AISLE'**
+  String get scanningActive;
+
+  /// No description provided for @pressToStartScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'PRESS TO START SCANNING'**
+  String get pressToStartScanning;
+
+  /// No description provided for @unknownTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Tag'**
+  String get unknownTag;
+
+  /// No description provided for @finishAndReview.
+  ///
+  /// In en, this message translates to:
+  /// **'FINISH & REVIEW'**
+  String get finishAndReview;
+
+  /// No description provided for @sessionComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Complete'**
+  String get sessionComplete;
+
+  /// No description provided for @reviewItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Items'**
+  String get reviewItems;
+
+  /// No description provided for @readyToReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to review and save to the database?'**
+  String get readyToReview;
+
+  /// No description provided for @reconciliation.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation'**
+  String get reconciliation;
+
+  /// No description provided for @commitInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'COMMIT INVENTORY'**
+  String get commitInventory;
+
+  /// No description provided for @match.
+  ///
+  /// In en, this message translates to:
+  /// **'Match'**
+  String get match;
+
+  /// No description provided for @missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing'**
+  String get missing;
+
+  /// No description provided for @overstock.
+  ///
+  /// In en, this message translates to:
+  /// **'Overstock'**
+  String get overstock;
+
+  /// No description provided for @unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
+  /// No description provided for @expected.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected: '**
+  String get expected;
+
+  /// No description provided for @found.
+  ///
+  /// In en, this message translates to:
+  /// **'Found: '**
+  String get found;
+
+  /// No description provided for @inventoryUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory Successfully Updated!'**
+  String get inventoryUpdatedSuccess;
 }
 
 class _AppLocalizationsDelegate
