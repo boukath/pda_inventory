@@ -1,6 +1,7 @@
 // File: lib/screens/add_rfid_product_screen.dart
 
 import 'dart:async';
+import 'dart:convert'; // <-- NEW: Required for jsonEncode
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -21,8 +22,12 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   StreamSubscription? _rfidSubscription;
   bool _isScanning = false;
 
-  // --- NEW: PRODUCT TYPE TOGGLE ---
-  String _productType = 'retail'; // Defaults to 'retail'. The other option is 'market'.
+  // --- PRODUCT TYPE TOGGLE ---
+  String _productType = 'retail';
+
+  // --- NEW: DYNAMIC CUSTOM FIELDS MAP ---
+  // This map holds an infinite amount of user-created fields!
+  final Map<String, TextEditingController> _customFields = {};
 
   // --- FORM CONTROLLERS ---
   final TextEditingController _epcController = TextEditingController();
@@ -89,18 +94,81 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   void dispose() {
     _stopScanning();
     _rfidSubscription?.cancel();
+
+    // Clean up dynamic controllers to prevent memory leaks
+    _customFields.forEach((key, controller) => controller.dispose());
+
     super.dispose();
   }
 
+  // --- DYNAMIC FIELD LOGIC ---
+  Future<void> _showAddCustomFieldDialog() async {
+    TextEditingController fieldNameController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Add Custom Field", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: fieldNameController,
+          decoration: const InputDecoration(
+            hintText: "e.g., Warranty, Battery Life",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A00E0), foregroundColor: Colors.white),
+            onPressed: () {
+              String newName = fieldNameController.text.trim();
+              if (newName.isNotEmpty && !_customFields.containsKey(newName)) {
+                setState(() {
+                  _customFields[newName] = TextEditingController();
+                });
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("Add Field"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteCustomField(String fieldName) {
+    setState(() {
+      _customFields[fieldName]?.dispose();
+      _customFields.remove(fieldName);
+    });
+  }
+
+  // --- SAVE DATA TO DB ---
   Future<void> _saveProduct() async {
+    // 1. Mandatory Checks
     if (_epcController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please scan an EPC tag first!"), backgroundColor: Colors.red));
       return;
     }
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Product Name is required!"), backgroundColor: Colors.red));
+      return;
+    }
 
+    // 2. Package dynamic custom fields into JSON
+    Map<String, String> customDataMap = {};
+    _customFields.forEach((key, controller) {
+      if (controller.text.trim().isNotEmpty) {
+        customDataMap[key] = controller.text.trim();
+      }
+    });
+    String customFieldsJson = jsonEncode(customDataMap);
+
+    // 3. Prepare the massive Enterprise package
     final productData = {
       'epc': _epcController.text,
-      'product_type': _productType, // <-- NEW: Saves the toggle switch state!
+      'product_type': _productType,
       'sku': _skuController.text,
       'barcode': _barcodeController.text,
       'product_name': _nameController.text,
@@ -132,6 +200,9 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       'stock_quantity': int.tryParse(_stockController.text) ?? 0,
       'reorder_level': int.tryParse(_reorderController.text) ?? 0,
       'date_added': DateTime.now().toIso8601String(),
+
+      // The Magic JSON Column!
+      'custom_fields': customFieldsJson,
     };
 
     await AppDatabaseHelper.instance.insertEnterpriseProduct(productData);
@@ -161,7 +232,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
           _buildTypeToggle(),
           const SizedBox(height: 20),
 
-          // 3. CORE DETAILS (Always Visible)
+          // 3. CORE DETAILS
           _buildExpandableSection(
               title: "Core Identification",
               icon: CupertinoIcons.barcode_viewfinder,
@@ -175,7 +246,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               ]
           ),
 
-          // 4. CONDITIONAL UI: Only shows if 'retail' is selected
+          // 4. CONDITIONAL UI: Retail
           if (_productType == 'retail')
             _buildExpandableSection(
                 title: "Apparel Details (Retail)",
@@ -189,7 +260,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                 ]
             ),
 
-          // 5. CONDITIONAL UI: Only shows if 'market' is selected
+          // 5. CONDITIONAL UI: Market
           if (_productType == 'market')
             _buildExpandableSection(
                 title: "Consumable Details (Market)",
@@ -202,7 +273,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                 ]
             ),
 
-          // 6. FINANCIAL (Always Visible)
+          // 6. FINANCIAL
           _buildExpandableSection(
               title: "Pricing & Suppliers",
               icon: CupertinoIcons.money_dollar_circle,
@@ -213,7 +284,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               ]
           ),
 
-          // 7. INVENTORY (Always Visible)
+          // 7. INVENTORY
           _buildExpandableSection(
               title: "Inventory & Location",
               icon: CupertinoIcons.building_2_fill,
@@ -222,6 +293,9 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                 _buildTextField(_zoneController, "Zone / Aisle (e.g. Aisle 4)"),
               ]
           ),
+
+          // 8. THE NEW DYNAMIC CUSTOM FIELDS SECTION
+          _buildDynamicFieldsSection(),
 
           const SizedBox(height: 30),
 
@@ -243,6 +317,64 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   }
 
   // --- WIDGET BUILDERS ---
+
+  Widget _buildDynamicFieldsSection() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.post_add, color: Color(0xFF4A00E0)),
+                const SizedBox(width: 8),
+                Text("Custom Fields", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Loop through map to draw existing dynamic fields
+            ..._customFields.entries.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: entry.value,
+                        decoration: InputDecoration(
+                          labelText: entry.key, // The custom name they typed!
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.trash, color: Colors.red),
+                      onPressed: () => _deleteCustomField(entry.key), // Deletes the field
+                    )
+                  ],
+                ),
+              );
+            }),
+
+            // Add Field Button
+            Center(
+              child: TextButton.icon(
+                onPressed: _showAddCustomFieldDialog,
+                icon: const Icon(Icons.add, color: Color(0xFF4A00E0)),
+                label: Text("Add Custom Field", style: GoogleFonts.poppins(color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildTypeToggle() {
     return Container(
@@ -327,7 +459,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
       child: ExpansionTile(
-        initiallyExpanded: true, // Auto-expand by default so it's easy to see!
+        initiallyExpanded: true,
         leading: Icon(icon, color: const Color(0xFF4A00E0)),
         title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         childrenPadding: const EdgeInsets.all(16),

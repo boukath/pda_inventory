@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'enterprise_catalog_screen.dart';
 import 'mode_selection_screen.dart';
 import 'rfid_screen.dart';
 import 'rfid_inventory_screen.dart';
@@ -182,6 +182,14 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                           icon: CupertinoIcons.add_circled_solid,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const AddRfidProductScreen()));
+                          },
+                        ),
+                        _buildGlassCard(
+                          context: context,
+                          title: "Enterprise Catalog",
+                          icon: CupertinoIcons.book_solid,
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const EnterpriseCatalogScreen()));
                           },
                         ),
                       ],

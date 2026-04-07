@@ -22,8 +22,9 @@ class AppDatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1, // Start fresh at version 1 for this new unified database
+      version: 2, // <-- Bumped to version 2 for the new dynamic fields
       onCreate: _createDB,
+      onUpgrade: _upgradeDB, // <-- Safe upgrade path included
     );
   }
 
@@ -71,9 +72,19 @@ class AppDatabaseHelper {
         zone_aisle TEXT,
         stock_quantity INTEGER,
         reorder_level INTEGER,
-        date_added TEXT
+        date_added TEXT,
+        
+        custom_fields TEXT -- <-- NEW: The magic column for dynamic fields!
       )
     ''');
+  }
+
+  // --- HANDLE DATABASE UPGRADES ---
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Safely add the custom_fields column to existing databases without losing data
+      await db.execute('ALTER TABLE enterprise_products ADD COLUMN custom_fields TEXT');
+    }
   }
 
   // ==========================================
@@ -113,5 +124,12 @@ class AppDatabaseHelper {
       productData,
       conflictAlgorithm: ConflictAlgorithm.replace, // Overwrite if the profile is updated
     );
+  }
+
+  // --- FETCH ALL ENTERPRISE PRODUCTS ---
+  Future<List<Map<String, dynamic>>> getAllEnterpriseProducts() async {
+    final db = await instance.database;
+    // Order them so the newest additions show up at the top of the list!
+    return await db.query('enterprise_products', orderBy: 'date_added DESC');
   }
 }
