@@ -2,23 +2,34 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import 'home_screen.dart';
 import 'simple_home_screen.dart';
+import 'rfid_dashboard_screen.dart'; // <-- IMPORT THE NEW SCREEN
 
 class ModeSelectionScreen extends StatelessWidget {
   const ModeSelectionScreen({super.key});
 
-  Future<void> _selectMode(BuildContext context, bool isSimple) async {
+  // --- NEW LOGIC: We now pass a String identifier instead of a boolean ---
+  Future<void> _selectMode(BuildContext context, String mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isSimpleMode', isSimple);
+    await prefs.setString('appMode', mode); // Save as String instead of bool
 
     if (!context.mounted) return;
 
+    // Decide which screen to show based on the string
+    Widget nextScreen;
+    if (mode == 'simple') {
+      nextScreen = const SimpleHomeScreen();
+    } else if (mode == 'rfid') {
+      nextScreen = const RfidDashboardScreen();
+    } else {
+      nextScreen = const HomeScreen();
+    }
+
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (context) => isSimple ? const SimpleHomeScreen() : const HomeScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => nextScreen),
           (route) => false,
     );
   }
@@ -38,18 +49,31 @@ class ModeSelectionScreen extends StatelessWidget {
                 style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 40),
+
+              // 1. Simple Mode Button
               _buildModeButton(
                 title: "Simple Mode",
                 subtitle: "Fast scanning (Inventaire, Reception, Bon)",
                 icon: Icons.qr_code_scanner,
-                onTap: () => _selectMode(context, true),
+                onTap: () => _selectMode(context, 'simple'), // Pass string
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // 2. Advanced Mode Button
               _buildModeButton(
                 title: "Advanced Mode",
                 subtitle: "Full database, prices, and suppliers",
                 icon: Icons.storage,
-                onTap: () => _selectMode(context, false),
+                onTap: () => _selectMode(context, 'advanced'), // Pass string
+              ),
+              const SizedBox(height: 16),
+
+              // 3. NEW: RFID Mode Button
+              _buildModeButton(
+                title: "RFID Mode",
+                subtitle: "UHF scanning, mass inventory & review",
+                icon: Icons.wifi_tethering,
+                onTap: () => _selectMode(context, 'rfid'), // Pass string
               ),
             ],
           ),

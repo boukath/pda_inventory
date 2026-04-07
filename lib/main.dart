@@ -8,31 +8,33 @@ import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/mode_selection_screen.dart';
 import 'screens/simple_home_screen.dart';
+import 'screens/rfid_dashboard_screen.dart'; // <-- Import the new RFID Dashboard Screen
 import 'providers/locale_provider.dart';
-import 'screens/splash_screen.dart'; // <-- Import the new Splash Screen
+import 'screens/splash_screen.dart'; // <-- Import the Splash Screen
 
-// 1. main() is now 'async' so we can check SharedPreferences before the app loads
+// 1. main() is async so we can check SharedPreferences before the app loads
 void main() async {
   // Ensure Flutter engine is fully initialized before doing async work
   WidgetsFlutterBinding.ensureInitialized();
 
   // 2. Check if the user previously selected a mode
   final prefs = await SharedPreferences.getInstance();
-  final bool? isSimpleMode = prefs.getBool('isSimpleMode');
+  // Fetch the string 'appMode' instead of the boolean 'isSimpleMode'
+  final String? savedMode = prefs.getString('appMode');
 
   runApp(
     ChangeNotifierProvider(
       create: (context) => LocaleProvider(),
-      // 3. Pass the saved preference into MyApp
-      child: MyApp(initialIsSimpleMode: isSimpleMode),
+      // 3. Pass the saved string preference into MyApp
+      child: MyApp(initialMode: savedMode),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  final bool? initialIsSimpleMode; // <-- Variable to hold the starting mode
+  final String? initialMode; // <-- Variable to hold the starting mode string
 
-  const MyApp({super.key, this.initialIsSimpleMode});
+  const MyApp({super.key, this.initialMode});
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +43,15 @@ class MyApp extends StatelessWidget {
     // --- 1. PREMIUM LOGIC ---
     // Figure out where the user is supposed to go after the splash screen
     Widget startScreen;
-    if (initialIsSimpleMode == false) {
+    if (initialMode == 'simple') {
+      startScreen = const SimpleHomeScreen();
+    } else if (initialMode == 'rfid') {
+      startScreen = const RfidDashboardScreen();
+    } else if (initialMode == 'advanced') {
       startScreen = const HomeScreen();
     } else {
-      startScreen = const SimpleHomeScreen();
+      // If nothing is saved (e.g., first install), show Mode Selection Screen
+      startScreen = const ModeSelectionScreen();
     }
 
     return MaterialApp(

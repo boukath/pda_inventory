@@ -5,6 +5,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/product.dart';
+import '../database/app_db_helper.dart';
+import 'rfid_inventory_screen.dart'; // <-- IMPORT INVENTORY SCREEN
 
 // A simple class to hold our comparison logic
 class ReviewItem {
@@ -36,11 +38,13 @@ class ReviewItem {
 class RfidReviewScreen extends StatefulWidget {
   final Map<String, int> scannedCounts;
   final Map<String, Product?> productCache;
+  final List<String> scannedEpcs; // <-- NEW: We need the raw EPCs to save them!
 
   const RfidReviewScreen({
     super.key,
     required this.scannedCounts,
     required this.productCache,
+    required this.scannedEpcs, // <-- NEW: Added to constructor
   });
 
   @override
@@ -82,7 +86,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
         items.add(ReviewItem(
           barcode: barcode,
           name: product.name,
-          expectedQty: product.stock, // <-- Changed to 'stock'
+          expectedQty: product.stock,
           scannedQty: scannedQty,
           productRef: product,
         ));
@@ -101,14 +105,12 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
     });
 
     // 3. Anything left in dbMap was NEVER SCANNED! (100% missing)
-    // Note: In a real app with 10,000 items, you might only want to do this
-    // for products assigned to the specific "Zone" the user was scanning.
     dbMap.forEach((barcode, product) {
-      if (product.stock > 0) { // <-- Changed to 'stock'
+      if (product.stock > 0) {
         items.add(ReviewItem(
           barcode: barcode,
           name: product.name,
-          expectedQty: product.stock, // <-- Changed to 'stock'
+          expectedQty: product.stock,
           scannedQty: 0, // We found zero!
           productRef: product,
         ));
@@ -136,16 +138,20 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
     });
   }
 
-  // --- THE COMMIT FUNCTION ---
-  Future<void> _commitToDatabase() async {
+  // --- NEW: THE COMMIT & NAVIGATE FUNCTION ---
+  Future<void> _commitAndNavigate() async {
     setState(() => _isLoading = true);
 
-    // Update the database for all known items
+    // 1. Save all raw EPCs to the isolated RFID Database
+    for (String epc in widget.scannedEpcs) {
+      await AppDatabaseHelper.instance.saveScannedEpc(epc);
+    }
+
+    // 2. Update the Main Product Database for quantities (Reconciliation)
     for (var item in _reviewItems) {
       if (item.productRef != null && item.variance != 0) {
-        // The quantity changed, let's update it in the database
         Product updatedProduct = item.productRef!.copyWith(
-          stock: item.scannedQty, // <-- Changed to 'stock' to match your model
+          stock: item.scannedQty,
         );
         await DatabaseHelper.instance.updateProduct(updatedProduct);
       }
@@ -153,14 +159,19 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
 
     if (!mounted) return;
 
-    // Show success and pop back to home
+    // 3. Show Success Message
     ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Inventory Successfully Updated!"),
+          content: Text("RFID Tags Saved & Inventory Updated!"),
           backgroundColor: Colors.green,
         )
     );
-    Navigator.popUntil(context, (route) => route.isFirst); // Go all the way to Home
+
+    // 4. Send the user to the RFID Inventory Screen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const RfidInventoryScreen()),
+    );
   }
 
   @override
@@ -199,10 +210,10 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
             ),
             icon: const Icon(Icons.cloud_upload, color: Colors.white),
             label: Text(
-              'COMMIT INVENTORY',
+              'SAVE & VIEW INVENTORY', // <-- Updated text
               style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
             ),
-            onPressed: _isLoading ? null : _commitToDatabase,
+            onPressed: _isLoading ? null : _commitAndNavigate, // <-- Calls the new function
           ),
         ),
       ),

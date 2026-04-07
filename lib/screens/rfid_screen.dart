@@ -161,6 +161,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                     builder: (context) => RfidReviewScreen(
                       scannedCounts: _inventoryCounts,
                       productCache: _productCache,
+                      scannedEpcs: _uniquePhysicalTags.toList(),
                     ),
                   ),
                 ).then((_) => _clearSession());
