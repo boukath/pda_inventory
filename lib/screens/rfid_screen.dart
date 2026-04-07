@@ -29,9 +29,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   final Map<String, Product?> _productCache = {};
   final Map<String, int> _inventoryCounts = {};
 
-  // Start with scanning paused so the user has to initiate it
   bool _isScanning = false;
-
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
 
@@ -44,6 +42,9 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     )..repeat(reverse: false);
 
     _audioPlayer.setVolume(1.0);
+
+    // FLUTTER COMMANDS THE HARDWARE TO BOOT UP
+    _methodChannel.invokeMethod('connectHardware');
     _startListeningToHardware();
   }
 
@@ -51,7 +52,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
       String data = event.toString().trim();
 
-      // 1. Listen for hardware trigger status to animate UI
       if (data == 'STATUS:START') {
         if (mounted) setState(() => _isScanning = true);
         return;
@@ -60,9 +60,10 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         return;
       }
 
-      // 2. Listen for actual scanned tags
       if (data.startsWith('TAG:')) {
-        if (!_isScanning) return; // Prevent ghost scans if UI is paused
+        if (!_isScanning) {
+          if (mounted) setState(() => _isScanning = true);
+        }
 
         String scannedTag = data.replaceAll('TAG:', '');
         if (scannedTag.isNotEmpty) {
@@ -76,8 +77,9 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    // Ensure the hardware stops scanning if the user leaves the screen
-    _methodChannel.invokeMethod('stopScan');
+    // FLUTTER COMMANDS THE HARDWARE TO GO TO SLEEP
+    _methodChannel.invokeMethod('disconnectHardware');
+
     _rfidSubscription?.cancel();
     _pulseController.dispose();
     _audioPlayer.dispose();
@@ -102,13 +104,11 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     }
   }
 
-  // --- UPDATED: The on-screen software trigger ---
   void _toggleScanning() {
     setState(() {
       _isScanning = !_isScanning;
     });
 
-    // Tell the Kotlin backend to start or stop the hardware
     if (_isScanning) {
       _methodChannel.invokeMethod('startScan');
     } else {
@@ -129,7 +129,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     setState(() {
       _isScanning = false;
     });
-    // Stop the physical gun when finishing session
     _methodChannel.invokeMethod('stopScan');
 
     showDialog(
@@ -195,7 +194,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(height: 30),
 
-                // --- THE SOFTWARE TRIGGER BUTTON ---
                 GestureDetector(
                   onTap: _toggleScanning,
                   child: Stack(
