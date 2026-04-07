@@ -90,7 +90,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     // 1. If we already scanned this exact tag in this session, ignore it (no extra beeps)
     if (_uniquePhysicalTags.contains(tag)) return;
 
-    // 2. NEW: Play the beep sound for the newly discovered tag!
+    // 2. Play the beep sound for the newly discovered tag!
     try {
       // Note: For audioplayers v3.0+, AssetSource assumes the file is inside the "assets/" folder
       await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
@@ -98,7 +98,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       debugPrint("Audio error: $e");
     }
 
-    // 3. Continue with your existing logic
+    // 3. Continue with existing logic
     _uniquePhysicalTags.add(tag);
     _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
 

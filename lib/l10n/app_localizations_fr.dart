@@ -260,4 +260,148 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get inventoryUpdatedSuccess => 'Inventaire mis à jour avec succès !';
+
+  @override
+  String get enterpriseCatalog => 'Catalogue d\'Entreprise';
+
+  @override
+  String get enterpriseCatalogSub => 'Liste globale des produits';
+
+  @override
+  String get rfidScannerSub => 'Scan en vrac continu';
+
+  @override
+  String get rfidInventory => 'Inventaire RFID';
+
+  @override
+  String get rfidInventorySub => 'Suivi des stocks et comptages';
+
+  @override
+  String get rfidReview => 'Vérification RFID';
+
+  @override
+  String get rfidReviewSub => 'Vérifier et sauver les tags';
+
+  @override
+  String get registerTag => 'Enregistrer un Tag';
+
+  @override
+  String get registerTagSub => 'Lier un tag RFID à un code-barres';
+
+  @override
+  String get allFilter => 'Tout';
+
+  @override
+  String get addCustomField => 'Ajouter un champ personnalisé';
+
+  @override
+  String get customFieldHint => 'ex: Garantie, Autonomie';
+
+  @override
+  String get addFieldBtn => 'Ajouter le champ';
+
+  @override
+  String get scanEpcWarning => 'Veuillez d\'abord scanner un tag EPC !';
+
+  @override
+  String get productNameRequired => 'Le nom du produit est requis !';
+
+  @override
+  String get productSavedSuccess => 'Produit enregistré avec succès !';
+
+  @override
+  String get registerRfidProduct => 'Enregistrer un produit RFID';
+
+  @override
+  String get customFieldsTitle => 'Champs personnalisés';
+
+  @override
+  String get retailApparel => '👔 Vente au détail (Vêtements)';
+
+  @override
+  String get marketGrocery => '🛒 Marché (Épicerie)';
+
+  @override
+  String get hardwareTagLink => 'Lien Matériel RFID';
+
+  @override
+  String get scannedEpcCode => 'Code EPC scanné';
+
+  @override
+  String get stopScanning => 'ARRÊTER LE SCAN';
+
+  @override
+  String get scanRfidLabel => 'SCANNER ÉTIQUETTE';
+
+  @override
+  String get coreIdentification => 'Identification principale';
+
+  @override
+  String get productNameReqLabel => 'Nom du produit (Requis)';
+
+  @override
+  String get skuInternalCode => 'SKU (Code interne)';
+
+  @override
+  String get barcodeUpc => 'Code-barres (UPC/EAN)';
+
+  @override
+  String get brandName => 'Marque';
+
+  @override
+  String get subCategory => 'Sous-catégorie';
+
+  @override
+  String get apparelDetails => 'Détails vestimentaires';
+
+  @override
+  String get sizeLabel => 'Taille (S, M, 32x34)';
+
+  @override
+  String get colorLabel => 'Couleur';
+
+  @override
+  String get genderDept => 'Genre / Rayon';
+
+  @override
+  String get seasonLabel => 'Saison (PE26)';
+
+  @override
+  String get materialLabel => 'Matériel (100% Coton)';
+
+  @override
+  String get consumableDetails => 'Détails consommables';
+
+  @override
+  String get batchLot => 'Lot / Numéro de lot';
+
+  @override
+  String get productionDate => 'Date de production (AAAA-MM-JJ)';
+
+  @override
+  String get expirationDate => 'Date d\'expiration (AAAA-MM-JJ)';
+
+  @override
+  String get weightVolume => 'Poids / Volume (ex: 500g)';
+
+  @override
+  String get pricingSuppliers => 'Prix et fournisseurs';
+
+  @override
+  String get sellingPriceMsrp => 'Prix de vente';
+
+  @override
+  String get supplierItemCode => 'Code article fournisseur';
+
+  @override
+  String get inventoryLocation => 'Inventaire et emplacement';
+
+  @override
+  String get currentStockQty => 'Quantité en stock actuelle';
+
+  @override
+  String get zoneAisle => 'Zone / Allée (ex: Allée 4)';
+
+  @override
+  String get saveEnterpriseProduct => 'SAUVER LE PRODUIT';
 }

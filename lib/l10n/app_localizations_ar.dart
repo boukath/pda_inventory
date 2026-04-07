@@ -257,4 +257,148 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get inventoryUpdatedSuccess => 'تم تحديث المخزون بنجاح!';
+
+  @override
+  String get enterpriseCatalog => 'كتالوج الشركة';
+
+  @override
+  String get enterpriseCatalogSub => 'قائمة منتجات المورد العالمية';
+
+  @override
+  String get rfidScannerSub => 'مسح جماعي مستمر';
+
+  @override
+  String get rfidInventory => 'جرد RFID';
+
+  @override
+  String get rfidInventorySub => 'تتبع المخزون والعدد';
+
+  @override
+  String get rfidReview => 'مراجعة RFID';
+
+  @override
+  String get rfidReviewSub => 'مراجعة وحفظ العلامات الممسوحة';
+
+  @override
+  String get registerTag => 'تسجيل علامة';
+
+  @override
+  String get registerTagSub => 'ربط علامة RFID جديدة بباركود';
+
+  @override
+  String get allFilter => 'الكل';
+
+  @override
+  String get addCustomField => 'إضافة حقل مخصص';
+
+  @override
+  String get customFieldHint => 'مثال: الضمان، عمر البطارية';
+
+  @override
+  String get addFieldBtn => 'إضافة حقل';
+
+  @override
+  String get scanEpcWarning => 'الرجاء مسح علامة EPC أولاً!';
+
+  @override
+  String get productNameRequired => 'اسم المنتج مطلوب!';
+
+  @override
+  String get productSavedSuccess => 'تم حفظ المنتج بنجاح!';
+
+  @override
+  String get registerRfidProduct => 'تسجيل منتج RFID';
+
+  @override
+  String get customFieldsTitle => 'حقول مخصصة';
+
+  @override
+  String get retailApparel => '👔 تجزئة (ملابس)';
+
+  @override
+  String get marketGrocery => '🛒 سوق (بقالة)';
+
+  @override
+  String get hardwareTagLink => 'ربط العلامة المادية';
+
+  @override
+  String get scannedEpcCode => 'رمز EPC الممسوح';
+
+  @override
+  String get stopScanning => 'إيقاف المسح';
+
+  @override
+  String get scanRfidLabel => 'مسح علامة RFID';
+
+  @override
+  String get coreIdentification => 'التعريف الأساسي';
+
+  @override
+  String get productNameReqLabel => 'اسم المنتج (مطلوب)';
+
+  @override
+  String get skuInternalCode => 'SKU (رمز داخلي)';
+
+  @override
+  String get barcodeUpc => 'الباركود (UPC/EAN)';
+
+  @override
+  String get brandName => 'اسم العلامة التجارية';
+
+  @override
+  String get subCategory => 'فئة فرعية';
+
+  @override
+  String get apparelDetails => 'تفاصيل الملابس (تجزئة)';
+
+  @override
+  String get sizeLabel => 'المقاس (S, M, 32x34)';
+
+  @override
+  String get colorLabel => 'اللون';
+
+  @override
+  String get genderDept => 'الجنس / القسم';
+
+  @override
+  String get seasonLabel => 'الموسم (صيف 26)';
+
+  @override
+  String get materialLabel => 'المادة (100% قطن)';
+
+  @override
+  String get consumableDetails => 'تفاصيل استهلاكية (سوق)';
+
+  @override
+  String get batchLot => 'رقم الدفعة / اللوط';
+
+  @override
+  String get productionDate => 'تاريخ الإنتاج (YYYY-MM-DD)';
+
+  @override
+  String get expirationDate => 'تاريخ الانتهاء (YYYY-MM-DD)';
+
+  @override
+  String get weightVolume => 'الوزن / الحجم (مثال 500 جم)';
+
+  @override
+  String get pricingSuppliers => 'التسعير والموردين';
+
+  @override
+  String get sellingPriceMsrp => 'سعر البيع';
+
+  @override
+  String get supplierItemCode => 'رمز صنف المورد';
+
+  @override
+  String get inventoryLocation => 'المخزون والموقع';
+
+  @override
+  String get currentStockQty => 'كمية المخزون الحالية';
+
+  @override
+  String get zoneAisle => 'المنطقة / الممر (مثال: ممر 4)';
+
+  @override
+  String get saveEnterpriseProduct => 'حفظ المنتج المؤسسي';
 }

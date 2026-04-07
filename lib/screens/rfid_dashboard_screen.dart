@@ -5,12 +5,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart'; // <-- Needed for language switcher
+
+import '../providers/locale_provider.dart'; // <-- Needed for changing language
+import '../l10n/app_localizations.dart'; // <-- Needed for translated strings
+
 import 'enterprise_catalog_screen.dart';
 import 'mode_selection_screen.dart';
 import 'rfid_screen.dart';
 import 'rfid_inventory_screen.dart';
 import 'rfid_review_screen.dart';
-import 'add_rfid_product_screen.dart'; // <-- NEW: Imported your registration screen
+import 'add_rfid_product_screen.dart';
 
 class RfidDashboardScreen extends StatefulWidget {
   const RfidDashboardScreen({super.key});
@@ -59,7 +64,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-            "Developer Mode",
+            AppLocalizations.of(context)!.developerMode, // <-- Localized
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045))
         ),
         content: TextField(
@@ -67,9 +72,9 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
           obscureText: true, // Hides the PIN as they type
           keyboardType: TextInputType.number,
           maxLength: 4, // Assuming a 4-digit PIN
-          decoration: const InputDecoration(
-            labelText: "Enter Admin PIN",
-            prefixIcon: Icon(Icons.lock),
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.enterAdminPin, // <-- Localized
+            prefixIcon: const Icon(Icons.lock),
           ),
         ),
         actions: [
@@ -77,7 +82,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
             onPressed: () {
               Navigator.pop(context); // Close dialog
             },
-            child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.grey)),
+            child: Text(AppLocalizations.of(context)!.cancel, style: GoogleFonts.poppins(color: Colors.grey)), // <-- Localized
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -98,11 +103,11 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                 // FAILURE! Wrong PIN.
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Incorrect PIN"), backgroundColor: Colors.red),
+                  SnackBar(content: Text(AppLocalizations.of(context)!.incorrectPin), backgroundColor: Colors.red), // <-- Localized
                 );
               }
             },
-            child: Text("Unlock", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            child: Text(AppLocalizations.of(context)!.unlock, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), // <-- Localized
           ),
         ],
       ),
@@ -142,11 +147,13 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                         child: Container(
                           color: Colors.transparent, // Ensures the whole area is tappable
                           child: Text(
-                            "RFID Dashboard",
+                            AppLocalizations.of(context)!.appTitle, // <-- Localized Title
                             style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0),
                           ),
                         ),
                       ),
+                      // --- NEW: LANGUAGE SWITCHER GLOBE ---
+                      _buildLanguageButton(context),
                     ],
                   ),
                 ),
@@ -161,7 +168,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                       children: [
                         _buildGlassCard(
                           context: context,
-                          title: "RFID Scanner",
+                          title: AppLocalizations.of(context)!.rfidScanner, // <-- Localized
                           icon: Icons.wifi_tethering,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidScreen()));
@@ -169,16 +176,16 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: "RFID Inventory",
+                          title: AppLocalizations.of(context)!.rfidInventory, // <-- Localized
                           icon: CupertinoIcons.archivebox,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidInventoryScreen()));
                           },
                         ),
-                        // --- NEW: Register Product Card ---
+                        // --- Register Product Card ---
                         _buildGlassCard(
                           context: context,
-                          title: "Register Product",
+                          title: AppLocalizations.of(context)!.registerTag, // <-- Localized
                           icon: CupertinoIcons.add_circled_solid,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const AddRfidProductScreen()));
@@ -186,7 +193,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: "Enterprise Catalog",
+                          title: AppLocalizations.of(context)!.enterpriseCatalog, // <-- Localized
                           icon: CupertinoIcons.book_solid,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const EnterpriseCatalogScreen()));
@@ -201,6 +208,37 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // --- LANGUAGE SWITCHER WIDGET ---
+  Widget _buildLanguageButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+      ),
+      child: PopupMenuButton<String>(
+        icon: const Icon(CupertinoIcons.globe, color: Colors.white),
+        color: Colors.white.withOpacity(0.95),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onSelected: (String languageCode) {
+          Provider.of<LocaleProvider>(context, listen: false).setLocale(Locale(languageCode, ''));
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          _buildMenuItem('en', 'English'),
+          _buildMenuItem('fr', 'Français'),
+          _buildMenuItem('ar', 'العربية'),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildMenuItem(String value, String text) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Text(text, style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: const Color(0xFF4A00E0))),
     );
   }
 

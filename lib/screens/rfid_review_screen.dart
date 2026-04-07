@@ -7,6 +7,7 @@ import '../database/db_helper.dart';
 import '../models/product.dart';
 import '../database/app_db_helper.dart';
 import 'rfid_inventory_screen.dart'; // <-- IMPORT INVENTORY SCREEN
+import '../l10n/app_localizations.dart'; // <-- IMPORT TRANSLATIONS
 
 // A simple class to hold our comparison logic
 class ReviewItem {
@@ -96,7 +97,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
         // Unknown product not in DB
         items.add(ReviewItem(
           barcode: barcode,
-          name: 'Unknown Tag',
+          name: '', // Name is handled dynamically in UI for translation
           expectedQty: 0,
           scannedQty: scannedQty,
           productRef: null,
@@ -159,10 +160,10 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
 
     if (!mounted) return;
 
-    // 3. Show Success Message
+    // 3. Show Translated Success Message
     ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("RFID Tags Saved & Inventory Updated!"),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.inventoryUpdatedSuccess),
           backgroundColor: Colors.green,
         )
     );
@@ -179,7 +180,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text('Reconciliation', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text(AppLocalizations.of(context)!.reconciliation, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
         backgroundColor: const Color(0xFF1E0045),
         foregroundColor: Colors.white,
       ),
@@ -187,13 +188,13 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF4A00E0)))
           : Column(
         children: [
-          _buildDashboard(),
+          _buildDashboard(context),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _reviewItems.length,
               itemBuilder: (context, index) {
-                return _buildReviewCard(_reviewItems[index]);
+                return _buildReviewCard(_reviewItems[index], context);
               },
             ),
           ),
@@ -210,10 +211,10 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
             ),
             icon: const Icon(Icons.cloud_upload, color: Colors.white),
             label: Text(
-              'SAVE & VIEW INVENTORY', // <-- Updated text
+              AppLocalizations.of(context)!.commitInventory, // Translated text
               style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
             ),
-            onPressed: _isLoading ? null : _commitAndNavigate, // <-- Calls the new function
+            onPressed: _isLoading ? null : _commitAndNavigate,
           ),
         ),
       ),
@@ -221,7 +222,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
   }
 
   // --- TOP DASHBOARD WIDGET ---
-  Widget _buildDashboard() {
+  Widget _buildDashboard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -231,10 +232,10 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatColumn('Match', _totalMatched, Colors.green),
-          _buildStatColumn('Missing', _totalMissing, Colors.red),
-          _buildStatColumn('Overstock', _totalOverstock, Colors.orange),
-          _buildStatColumn('Unknown', _totalUnknown, Colors.grey),
+          _buildStatColumn(AppLocalizations.of(context)!.match, _totalMatched, Colors.green),
+          _buildStatColumn(AppLocalizations.of(context)!.missing, _totalMissing, Colors.red),
+          _buildStatColumn(AppLocalizations.of(context)!.overstock, _totalOverstock, Colors.orange),
+          _buildStatColumn(AppLocalizations.of(context)!.unknown, _totalUnknown, Colors.grey),
         ],
       ),
     );
@@ -250,7 +251,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
   }
 
   // --- INDIVIDUAL ITEM CARD WIDGET ---
-  Widget _buildReviewCard(ReviewItem item) {
+  Widget _buildReviewCard(ReviewItem item, BuildContext context) {
     Color cardColor;
     IconData icon;
 
@@ -289,7 +290,11 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+                  // Dynamically translates "Unknown Tag" if product is null
+                  Text(
+                      item.productRef == null ? AppLocalizations.of(context)!.unknownTag : item.name,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)
+                  ),
                   Text(item.barcode, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
                 ],
               ),
@@ -297,9 +302,9 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('Expected: ${item.expectedQty}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+                Text('${AppLocalizations.of(context)!.expected}${item.expectedQty}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                 Text(
-                    'Found: ${item.scannedQty}',
+                    '${AppLocalizations.of(context)!.found}${item.scannedQty}',
                     style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: cardColor)
                 ),
                 if (item.variance != 0 && item.status != 'unknown')

@@ -1,19 +1,20 @@
 // File: lib/screens/mode_selection_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'home_screen.dart';
 import 'simple_home_screen.dart';
 import 'rfid_dashboard_screen.dart'; // <-- IMPORT THE NEW SCREEN
+import '../license_helper.dart'; // <-- IMPORT THE NEW HIDDEN FILE HELPER
 
 class ModeSelectionScreen extends StatelessWidget {
   const ModeSelectionScreen({super.key});
 
   // --- NEW LOGIC: We now pass a String identifier instead of a boolean ---
   Future<void> _selectMode(BuildContext context, String mode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('appMode', mode); // Save as String instead of bool
+    // 1. REPLACE the SharedPreferences saving with our LicenseHelper
+    // This saves it to normal memory AND the hidden secure folder!
+    await LicenseHelper.saveLicense(mode);
 
     if (!context.mounted) return;
 

@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/app_db_helper.dart';
+import '../l10n/app_localizations.dart'; // <-- TRANSLATIONS IMPORT
 
 class AddRfidProductScreen extends StatefulWidget {
   const AddRfidProductScreen({super.key});
@@ -109,16 +110,16 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("Add Custom Field", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text(AppLocalizations.of(context)!.addCustomField, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         content: TextField(
           controller: fieldNameController,
-          decoration: const InputDecoration(
-            hintText: "e.g., Warranty, Battery Life",
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: AppLocalizations.of(context)!.customFieldHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(AppLocalizations.of(context)!.cancel)),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A00E0), foregroundColor: Colors.white),
             onPressed: () {
@@ -130,7 +131,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               }
               Navigator.pop(context);
             },
-            child: const Text("Add Field"),
+            child: Text(AppLocalizations.of(context)!.addFieldBtn),
           ),
         ],
       ),
@@ -148,11 +149,11 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   Future<void> _saveProduct() async {
     // 1. Mandatory Checks
     if (_epcController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please scan an EPC tag first!"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.scanEpcWarning), backgroundColor: Colors.red));
       return;
     }
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Product Name is required!"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.productNameRequired), backgroundColor: Colors.red));
       return;
     }
 
@@ -208,7 +209,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     await AppDatabaseHelper.instance.insertEnterpriseProduct(productData);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Product Successfully Saved!"), backgroundColor: Colors.green));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.productSavedSuccess), backgroundColor: Colors.green));
     Navigator.pop(context);
   }
 
@@ -217,7 +218,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text("Register RFID Product", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text(AppLocalizations.of(context)!.registerRfidProduct, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF4A00E0),
         foregroundColor: Colors.white,
       ),
@@ -225,77 +226,77 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // 1. HARDWARE SCANNER SECTION
-          _buildHardwareCard(),
+          _buildHardwareCard(context),
           const SizedBox(height: 20),
 
           // 2. THE NEW TYPE TOGGLE SWITCH
-          _buildTypeToggle(),
+          _buildTypeToggle(context),
           const SizedBox(height: 20),
 
           // 3. CORE DETAILS
           _buildExpandableSection(
-              title: "Core Identification",
+              title: AppLocalizations.of(context)!.coreIdentification,
               icon: CupertinoIcons.barcode_viewfinder,
               children: [
-                _buildTextField(_nameController, "Product Name (Required)"),
-                _buildTextField(_skuController, "SKU (Internal Code)"),
-                _buildTextField(_barcodeController, "Barcode (UPC/EAN)"),
-                _buildTextField(_brandController, "Brand Name"),
-                _buildTextField(_categoryController, "Category"),
-                _buildTextField(_subCategoryController, "Sub-Category"),
+                _buildTextField(_nameController, AppLocalizations.of(context)!.productNameReqLabel),
+                _buildTextField(_skuController, AppLocalizations.of(context)!.skuInternalCode),
+                _buildTextField(_barcodeController, AppLocalizations.of(context)!.barcodeUpc),
+                _buildTextField(_brandController, AppLocalizations.of(context)!.brandName),
+                _buildTextField(_categoryController, AppLocalizations.of(context)!.category),
+                _buildTextField(_subCategoryController, AppLocalizations.of(context)!.subCategory),
               ]
           ),
 
           // 4. CONDITIONAL UI: Retail
           if (_productType == 'retail')
             _buildExpandableSection(
-                title: "Apparel Details (Retail)",
+                title: AppLocalizations.of(context)!.apparelDetails,
                 icon: Icons.checkroom,
                 children: [
-                  _buildTextField(_sizeController, "Size (S, M, 32x34)"),
-                  _buildTextField(_colorController, "Color"),
-                  _buildTextField(_genderController, "Gender / Dept"),
-                  _buildTextField(_seasonController, "Season (SS26)"),
-                  _buildTextField(_materialController, "Material (100% Cotton)"),
+                  _buildTextField(_sizeController, AppLocalizations.of(context)!.sizeLabel),
+                  _buildTextField(_colorController, AppLocalizations.of(context)!.colorLabel),
+                  _buildTextField(_genderController, AppLocalizations.of(context)!.genderDept),
+                  _buildTextField(_seasonController, AppLocalizations.of(context)!.seasonLabel),
+                  _buildTextField(_materialController, AppLocalizations.of(context)!.materialLabel),
                 ]
             ),
 
           // 5. CONDITIONAL UI: Market
           if (_productType == 'market')
             _buildExpandableSection(
-                title: "Consumable Details (Market)",
+                title: AppLocalizations.of(context)!.consumableDetails,
                 icon: Icons.local_grocery_store_outlined,
                 children: [
-                  _buildTextField(_batchController, "Batch / Lot Number"),
-                  _buildTextField(_prodDateController, "Production Date (YYYY-MM-DD)"),
-                  _buildTextField(_expDateController, "Expiration Date (YYYY-MM-DD)"),
-                  _buildTextField(_weightController, "Weight / Volume (e.g. 500g)"),
+                  _buildTextField(_batchController, AppLocalizations.of(context)!.batchLot),
+                  _buildTextField(_prodDateController, AppLocalizations.of(context)!.productionDate),
+                  _buildTextField(_expDateController, AppLocalizations.of(context)!.expirationDate),
+                  _buildTextField(_weightController, AppLocalizations.of(context)!.weightVolume),
                 ]
             ),
 
           // 6. FINANCIAL
           _buildExpandableSection(
-              title: "Pricing & Suppliers",
+              title: AppLocalizations.of(context)!.pricingSuppliers,
               icon: CupertinoIcons.money_dollar_circle,
               children: [
-                _buildTextField(_sellingPriceController, "Selling Price (MSRP)", isNumber: true),
-                _buildTextField(_costPriceController, "Cost Price", isNumber: true),
-                _buildTextField(_supplierCodeController, "Supplier Item Code"),
+                _buildTextField(_sellingPriceController, AppLocalizations.of(context)!.sellingPriceMsrp, isNumber: true),
+                _buildTextField(_costPriceController, AppLocalizations.of(context)!.costPrice, isNumber: true),
+                _buildTextField(_supplierCodeController, AppLocalizations.of(context)!.supplierItemCode),
               ]
           ),
 
           // 7. INVENTORY
           _buildExpandableSection(
-              title: "Inventory & Location",
+              title: AppLocalizations.of(context)!.inventoryLocation,
               icon: CupertinoIcons.building_2_fill,
               children: [
-                _buildTextField(_stockController, "Current Stock Quantity", isNumber: true),
-                _buildTextField(_zoneController, "Zone / Aisle (e.g. Aisle 4)"),
+                _buildTextField(_stockController, AppLocalizations.of(context)!.currentStockQty, isNumber: true),
+                _buildTextField(_zoneController, AppLocalizations.of(context)!.zoneAisle),
               ]
           ),
 
           // 8. THE NEW DYNAMIC CUSTOM FIELDS SECTION
-          _buildDynamicFieldsSection(),
+          _buildDynamicFieldsSection(context),
 
           const SizedBox(height: 30),
 
@@ -307,7 +308,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             icon: const Icon(Icons.save, color: Colors.white),
-            label: Text("SAVE ENTERPRISE PRODUCT", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            label: Text(AppLocalizations.of(context)!.saveEnterpriseProduct, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             onPressed: _saveProduct,
           ),
           const SizedBox(height: 30),
@@ -318,7 +319,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
 
   // --- WIDGET BUILDERS ---
 
-  Widget _buildDynamicFieldsSection() {
+  Widget _buildDynamicFieldsSection(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -332,7 +333,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               children: [
                 const Icon(Icons.post_add, color: Color(0xFF4A00E0)),
                 const SizedBox(width: 8),
-                Text("Custom Fields", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(AppLocalizations.of(context)!.customFieldsTitle, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
             ),
             const SizedBox(height: 12),
@@ -367,7 +368,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               child: TextButton.icon(
                 onPressed: _showAddCustomFieldDialog,
                 icon: const Icon(Icons.add, color: Color(0xFF4A00E0)),
-                label: Text("Add Custom Field", style: GoogleFonts.poppins(color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)),
+                label: Text(AppLocalizations.of(context)!.addCustomField, style: GoogleFonts.poppins(color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -376,7 +377,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     );
   }
 
-  Widget _buildTypeToggle() {
+  Widget _buildTypeToggle(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -392,11 +393,11 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
         children: {
           'retail': Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text("👔 Retail (Apparel)", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: _productType == 'retail' ? Colors.white : Colors.black87)),
+            child: Text(AppLocalizations.of(context)!.retailApparel, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: _productType == 'retail' ? Colors.white : Colors.black87)),
           ),
           'market': Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Text("🛒 Market (Grocery)", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: _productType == 'market' ? Colors.white : Colors.black87)),
+            child: Text(AppLocalizations.of(context)!.marketGrocery, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: _productType == 'market' ? Colors.white : Colors.black87)),
           ),
         },
         onValueChanged: (value) {
@@ -408,7 +409,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     );
   }
 
-  Widget _buildHardwareCard() {
+  Widget _buildHardwareCard(BuildContext context) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF4A00E0), width: 2)),
@@ -418,13 +419,13 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
           children: [
             Icon(Icons.wifi_tethering, size: 40, color: _isScanning ? Colors.red : const Color(0xFF4A00E0)),
             const SizedBox(height: 10),
-            Text("Hardware Tag Link", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(AppLocalizations.of(context)!.hardwareTagLink, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 16),
             TextField(
               controller: _epcController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: "Scanned EPC Code",
+                labelText: AppLocalizations.of(context)!.scannedEpcCode,
                 filled: true,
                 fillColor: Colors.grey[200],
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -442,7 +443,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                 ),
                 onPressed: _isScanning ? _stopScanning : _startScanning,
                 child: Text(
-                    _isScanning ? "STOP SCANNING" : "SCAN RFID LABEL",
+                    _isScanning ? AppLocalizations.of(context)!.stopScanning : AppLocalizations.of(context)!.scanRfidLabel,
                     style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
                 ),
               ),

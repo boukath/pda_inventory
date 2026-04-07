@@ -2,25 +2,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // <-- Needed for saving preferences
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'screens/mode_selection_screen.dart';
 import 'screens/simple_home_screen.dart';
-import 'screens/rfid_dashboard_screen.dart'; // <-- Import the new RFID Dashboard Screen
+import 'screens/rfid_dashboard_screen.dart';
 import 'providers/locale_provider.dart';
-import 'screens/splash_screen.dart'; // <-- Import the Splash Screen
+import 'screens/splash_screen.dart';
+import 'license_helper.dart'; // <-- Import the new hidden file helper
 
-// 1. main() is async so we can check SharedPreferences before the app loads
+// 1. main() is async so we can check the LicenseHelper before the app loads
 void main() async {
   // Ensure Flutter engine is fully initialized before doing async work
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Check if the user previously selected a mode
-  final prefs = await SharedPreferences.getInstance();
-  // Fetch the string 'appMode' instead of the boolean 'isSimpleMode'
-  final String? savedMode = prefs.getString('appMode');
+  // 2. CHECK THE HIDDEN LICENSE
+  // This automatically checks standard SharedPreferences first,
+  // and if it was wiped, it magically restores it from the hidden folder!
+  final String? savedMode = await LicenseHelper.getLicense();
 
   runApp(
     ChangeNotifierProvider(
@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget {
     } else if (initialMode == 'advanced') {
       startScreen = const HomeScreen();
     } else {
-      // If nothing is saved (e.g., first install), show Mode Selection Screen
+      // If nothing is saved (e.g., brand new physical device), show Mode Selection Screen
       startScreen = const ModeSelectionScreen();
     }
 

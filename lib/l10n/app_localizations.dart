@@ -597,6 +597,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Inventory Successfully Updated!'**
   String get inventoryUpdatedSuccess;
+
+  /// No description provided for @enterpriseCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Enterprise Catalog'**
+  String get enterpriseCatalog;
+
+  /// No description provided for @enterpriseCatalogSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Global supplier product list'**
+  String get enterpriseCatalogSub;
+
+  /// No description provided for @rfidScannerSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Continuous bulk scanning'**
+  String get rfidScannerSub;
+
+  /// No description provided for @rfidInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'RFID Inventory'**
+  String get rfidInventory;
+
+  /// No description provided for @rfidInventorySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Track stock and counts'**
+  String get rfidInventorySub;
+
+  /// No description provided for @rfidReview.
+  ///
+  /// In en, this message translates to:
+  /// **'RFID Review'**
+  String get rfidReview;
+
+  /// No description provided for @rfidReviewSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & save scanned tags'**
+  String get rfidReviewSub;
+
+  /// No description provided for @registerTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Register Tag'**
+  String get registerTag;
+
+  /// No description provided for @registerTagSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Link a new RFID tag to a barcode'**
+  String get registerTagSub;
+
+  /// No description provided for @allFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get allFilter;
+
+  /// No description provided for @addCustomField.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Custom Field'**
+  String get addCustomField;
+
+  /// No description provided for @customFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., Warranty, Battery Life'**
+  String get customFieldHint;
+
+  /// No description provided for @addFieldBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Field'**
+  String get addFieldBtn;
+
+  /// No description provided for @scanEpcWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please scan an EPC tag first!'**
+  String get scanEpcWarning;
+
+  /// No description provided for @productNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Name is required!'**
+  String get productNameRequired;
+
+  /// No description provided for @productSavedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Successfully Saved!'**
+  String get productSavedSuccess;
+
+  /// No description provided for @registerRfidProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Register RFID Product'**
+  String get registerRfidProduct;
+
+  /// No description provided for @customFieldsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Fields'**
+  String get customFieldsTitle;
+
+  /// No description provided for @retailApparel.
+  ///
+  /// In en, this message translates to:
+  /// **'👔 Retail (Apparel)'**
+  String get retailApparel;
+
+  /// No description provided for @marketGrocery.
+  ///
+  /// In en, this message translates to:
+  /// **'🛒 Market (Grocery)'**
+  String get marketGrocery;
+
+  /// No description provided for @hardwareTagLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Tag Link'**
+  String get hardwareTagLink;
+
+  /// No description provided for @scannedEpcCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanned EPC Code'**
+  String get scannedEpcCode;
+
+  /// No description provided for @stopScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'STOP SCANNING'**
+  String get stopScanning;
+
+  /// No description provided for @scanRfidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SCAN RFID LABEL'**
+  String get scanRfidLabel;
+
+  /// No description provided for @coreIdentification.
+  ///
+  /// In en, this message translates to:
+  /// **'Core Identification'**
+  String get coreIdentification;
+
+  /// No description provided for @productNameReqLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Name (Required)'**
+  String get productNameReqLabel;
+
+  /// No description provided for @skuInternalCode.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU (Internal Code)'**
+  String get skuInternalCode;
+
+  /// No description provided for @barcodeUpc.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode (UPC/EAN)'**
+  String get barcodeUpc;
+
+  /// No description provided for @brandName.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand Name'**
+  String get brandName;
+
+  /// No description provided for @subCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-Category'**
+  String get subCategory;
+
+  /// No description provided for @apparelDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Apparel Details (Retail)'**
+  String get apparelDetails;
+
+  /// No description provided for @sizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Size (S, M, 32x34)'**
+  String get sizeLabel;
+
+  /// No description provided for @colorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get colorLabel;
+
+  /// No description provided for @genderDept.
+  ///
+  /// In en, this message translates to:
+  /// **'Gender / Dept'**
+  String get genderDept;
+
+  /// No description provided for @seasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Season (SS26)'**
+  String get seasonLabel;
+
+  /// No description provided for @materialLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Material (100% Cotton)'**
+  String get materialLabel;
+
+  /// No description provided for @consumableDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumable Details (Market)'**
+  String get consumableDetails;
+
+  /// No description provided for @batchLot.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch / Lot Number'**
+  String get batchLot;
+
+  /// No description provided for @productionDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Date (YYYY-MM-DD)'**
+  String get productionDate;
+
+  /// No description provided for @expirationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiration Date (YYYY-MM-DD)'**
+  String get expirationDate;
+
+  /// No description provided for @weightVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight / Volume (e.g. 500g)'**
+  String get weightVolume;
+
+  /// No description provided for @pricingSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing & Suppliers'**
+  String get pricingSuppliers;
+
+  /// No description provided for @sellingPriceMsrp.
+  ///
+  /// In en, this message translates to:
+  /// **'Selling Price (MSRP)'**
+  String get sellingPriceMsrp;
+
+  /// No description provided for @supplierItemCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier Item Code'**
+  String get supplierItemCode;
+
+  /// No description provided for @inventoryLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory & Location'**
+  String get inventoryLocation;
+
+  /// No description provided for @currentStockQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Stock Quantity'**
+  String get currentStockQty;
+
+  /// No description provided for @zoneAisle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone / Aisle (e.g. Aisle 4)'**
+  String get zoneAisle;
+
+  /// No description provided for @saveEnterpriseProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'SAVE ENTERPRISE PRODUCT'**
+  String get saveEnterpriseProduct;
 }
 
 class _AppLocalizationsDelegate

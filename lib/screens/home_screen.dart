@@ -15,8 +15,6 @@ import 'inventory_screen.dart';
 import 'export_screen.dart';
 import 'print_labels_screen.dart';
 import 'mode_selection_screen.dart'; // <-- New import for Kiosk Escape
-import 'rfid_screen.dart'; // <-- Import the RFID Screen
-import 'rfid_inventory_screen.dart'; // <-- NEW: Import the RFID Inventory Screen!
 
 // 1. Changed to StatefulWidget to manage Focus and state
 class HomeScreen extends StatefulWidget {
@@ -282,24 +280,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: CupertinoIcons.cube_box,
                             onTap: () {
                               Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen())).then((_) => _focusNode.requestFocus());
-                            },
-                          ),
-                          // --- NEW: RFID Scanner Button ---
-                          _buildGlassCard(
-                            context: context,
-                            title: 'RFID Scanner',
-                            icon: Icons.wifi_tethering,
-                            onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidScreen())).then((_) => _focusNode.requestFocus());
-                            },
-                          ),
-                          // --- NEW: RFID Inventory Button ---
-                          _buildGlassCard(
-                            context: context,
-                            title: 'RFID Inventory',
-                            icon: CupertinoIcons.archivebox,
-                            onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidInventoryScreen())).then((_) => _focusNode.requestFocus());
                             },
                           ),
                           _buildGlassCard(
