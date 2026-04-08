@@ -4,11 +4,12 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart'; // <-- NEW: Needed for Channels & Haptics
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart'; // <-- Needed for language switcher
+import 'package:provider/provider.dart';
 
-import '../providers/locale_provider.dart'; // <-- Needed for changing language
-import '../l10n/app_localizations.dart'; // <-- Needed for translated strings
+import '../providers/locale_provider.dart';
+import '../l10n/app_localizations.dart';
 
 import 'enterprise_catalog_screen.dart';
 import 'mode_selection_screen.dart';
@@ -28,61 +29,96 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
   // --- SECRET ADMIN MENU VARIABLES ---
   int _secretTapCount = 0;
   Timer? _secretTapTimer;
-  final String _adminPin = "2026"; // <-- Your Kiosk Escape PIN
+  final String _adminPin = "2026";
+
+  // =========================================================
+  // --- NEW: HARDWARE TELEMETRY VARIABLES ---
+  // =========================================================
+  static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid_events');
+  static const MethodChannel _methodChannel = MethodChannel('com.pda_inventory/rfid_methods');
+  StreamSubscription? _rfidSubscription;
+
+  int _batteryLevel = -1; // -1 means hidden/calculating
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToHardware(); // Start listening for battery status when dashboard opens
+  }
+
+  void _listenToHardware() {
+    // Listen for Battery Broadcasts from MainActivity.kt
+    _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((event) {
+      final String data = event.toString();
+      if (data.startsWith('BATTERY:')) {
+        if (mounted) {
+          setState(() {
+            _batteryLevel = int.tryParse(data.split(':')[1]) ?? -1;
+          });
+        }
+      }
+    });
+
+    // Request the battery level as soon as the dashboard loads
+    _fetchBattery();
+  }
+
+  Future<void> _fetchBattery() async {
+    try {
+      await _methodChannel.invokeMethod('getBattery');
+    } catch (e) {
+      debugPrint("Could not fetch sled battery: $e");
+    }
+  }
+  // =========================================================
 
   @override
   void dispose() {
-    _secretTapTimer?.cancel(); // Cancel secret Kiosk timer
+    _rfidSubscription?.cancel(); // Cancel hardware listener
+    _secretTapTimer?.cancel();
     super.dispose();
   }
 
-  // --- SECRET TAP LOGIC ---
   void _handleSecretTap() {
     _secretTapCount++;
-
-    // Reset the counter if they stop tapping for more than 1 second
     _secretTapTimer?.cancel();
     _secretTapTimer = Timer(const Duration(milliseconds: 1000), () {
       _secretTapCount = 0;
     });
 
-    // If they tap 7 times fast, trigger the PIN pad!
     if (_secretTapCount >= 7) {
-      _secretTapCount = 0; // Reset
+      _secretTapCount = 0;
       _showAdminPinDialog();
     }
   }
 
-  // --- THE ADMIN PIN DIALOG ---
   void _showAdminPinDialog() {
     final TextEditingController pinController = TextEditingController();
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Force them to enter pin or cancel
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-            AppLocalizations.of(context)!.developerMode, // <-- Localized
+            AppLocalizations.of(context)!.developerMode,
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045))
         ),
         content: TextField(
           controller: pinController,
-          obscureText: true, // Hides the PIN as they type
+          obscureText: true,
           keyboardType: TextInputType.number,
-          maxLength: 4, // Assuming a 4-digit PIN
+          maxLength: 4,
           decoration: InputDecoration(
-            labelText: AppLocalizations.of(context)!.enterAdminPin, // <-- Localized
+            labelText: AppLocalizations.of(context)!.enterAdminPin,
             prefixIcon: const Icon(Icons.lock),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-            },
-            child: Text(AppLocalizations.of(context)!.cancel, style: GoogleFonts.poppins(color: Colors.grey)), // <-- Localized
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppLocalizations.of(context)!.cancel, style: GoogleFonts.poppins(color: Colors.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -92,7 +128,6 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
             ),
             onPressed: () {
               if (pinController.text == _adminPin) {
-                // SUCCESS! Take the developer to the secret mode selection screen
                 Navigator.pop(context);
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -100,19 +135,79 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                       (route) => false,
                 );
               } else {
-                // FAILURE! Wrong PIN.
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppLocalizations.of(context)!.incorrectPin), backgroundColor: Colors.red), // <-- Localized
+                  SnackBar(content: Text(AppLocalizations.of(context)!.incorrectPin), backgroundColor: Colors.red),
                 );
               }
             },
-            child: Text(AppLocalizations.of(context)!.unlock, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), // <-- Localized
+            child: Text(AppLocalizations.of(context)!.unlock, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
+
+  // ==============================================================
+  // --- NEW PREMIUM UI: APPLE DYNAMIC ISLAND SLED BATTERY ---
+  // ==============================================================
+  Widget _buildDynamicIsland() {
+    bool isVisible = _batteryLevel >= 0;
+    bool isLow = _batteryLevel > 0 && _batteryLevel <= 20;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _fetchBattery(); // Refresh battery on tap!
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.elasticOut,
+        height: isVisible ? 36 : 0,
+        width: isVisible ? 110 : 0,
+        margin: const EdgeInsets.only(top: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            // If battery is low, pulse a red warning shadow!
+            if (isLow)
+              BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 12, spreadRadius: 2)
+          ],
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Container(
+            width: 110,
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isLow ? CupertinoIcons.battery_25 : CupertinoIcons.battery_100,
+                  color: isLow ? Colors.redAccent : Colors.greenAccent,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "$_batteryLevel%",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  // ==============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -141,18 +236,16 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // --- WRAPPED THE TITLE IN GESTURE DETECTOR ---
                       GestureDetector(
-                        onTap: _handleSecretTap, // Hidden 7-tap trigger
+                        onTap: _handleSecretTap,
                         child: Container(
-                          color: Colors.transparent, // Ensures the whole area is tappable
+                          color: Colors.transparent,
                           child: Text(
-                            AppLocalizations.of(context)!.appTitle, // <-- Localized Title
+                            AppLocalizations.of(context)!.appTitle,
                             style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0),
                           ),
                         ),
                       ),
-                      // --- NEW: LANGUAGE SWITCHER GLOBE ---
                       _buildLanguageButton(context),
                     ],
                   ),
@@ -168,7 +261,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                       children: [
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.rfidScanner, // <-- Localized
+                          title: AppLocalizations.of(context)!.rfidScanner,
                           icon: Icons.wifi_tethering,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidScreen()));
@@ -176,16 +269,15 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.rfidInventory, // <-- Localized
+                          title: AppLocalizations.of(context)!.rfidInventory,
                           icon: CupertinoIcons.archivebox,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidInventoryScreen()));
                           },
                         ),
-                        // --- Register Product Card ---
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.registerTag, // <-- Localized
+                          title: AppLocalizations.of(context)!.registerTag,
                           icon: CupertinoIcons.add_circled_solid,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const AddRfidProductScreen()));
@@ -193,7 +285,7 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.enterpriseCatalog, // <-- Localized
+                          title: AppLocalizations.of(context)!.enterpriseCatalog,
                           icon: CupertinoIcons.book_solid,
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => const EnterpriseCatalogScreen()));
@@ -206,12 +298,20 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
               ],
             ),
           ),
+
+          // --- THE DYNAMIC ISLAND PLACEMENT ---
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: _buildDynamicIsland(),
+            ),
+          ),
+          // ------------------------------------
         ],
       ),
     );
   }
 
-  // --- LANGUAGE SWITCHER WIDGET ---
   Widget _buildLanguageButton(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -242,7 +342,6 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
     );
   }
 
-  // --- GLASSMORPHISM CARD WIDGET ---
   Widget _buildGlassCard({required BuildContext context, required String title, required IconData icon, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,

@@ -36,36 +36,62 @@ class MainActivity: FlutterActivity() {
             }
         )
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL_NAME).setMethodCallHandler { call, result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL_NAME).setMethodCallHandler { call, methodResult ->
             when (call.method) {
                 "connectHardware" -> {
                     connectToSled()
-                    result.success(null)
+                    methodResult.success(null)
                 }
                 "disconnectHardware" -> {
                     mReader?.SD_Disconnect()
-                    result.success(null)
+                    methodResult.success(null)
                 }
                 "startScan" -> {
                     startInventory()
-                    result.success(null)
+                    methodResult.success(null)
                 }
                 "stopScan" -> {
                     stopInventory()
-                    result.success(null)
+                    methodResult.success(null)
                 }
-                // --- NEW: LISTEN FOR WRITE COMMAND FROM FLUTTER ---
                 "writeEpc" -> {
                     val newEpc = call.argument<String>("newEpc")
                     if (newEpc != null && newEpc.length % 4 == 0) {
                         writeTagEpc(newEpc)
-                        result.success(true)
+                        methodResult.success(true)
                     } else {
-                        result.error("INVALID_EPC", "EPC must be a valid hex string of proper length", null)
+                        methodResult.error("INVALID_EPC", "EPC must be a valid hex string of proper length", null)
                     }
                 }
-                // --------------------------------------------------
-                else -> result.notImplemented()
+                "setTxPower" -> {
+                    val power = call.argument<Int>("power") ?: 30
+                    if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
+                        try {
+                            val ret = mReader?.RF_SetRadioPowerState(power)
+                            Log.d("RFID_DEBUG", "📡 Antenna Power Set to $power dBm. Result: $ret")
+                            methodResult.success(true)
+                        } catch (e: Exception) {
+                            Log.e("RFID_DEBUG", "❌ Exception setting power: ${e.message}")
+                            methodResult.error("HARDWARE_ERROR", e.message, null)
+                        }
+                    } else {
+                        Log.e("RFID_DEBUG", "❌ Cannot set power. Sled disconnected.")
+                        methodResult.error("DISCONNECTED", "Sled is not connected", null)
+                    }
+                }
+                // =========================================================
+                // --- NEW: FETCH SLED BATTERY COMMAND FROM FLUTTER ---
+                // =========================================================
+                "getBattery" -> {
+                    if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
+                        mReader?.SD_GetBatteryStatus() // Asks hardware to broadcast battery
+                        methodResult.success(true)
+                    } else {
+                        methodResult.error("DISCONNECTED", "Sled is not connected", null)
+                    }
+                }
+                // =========================================================
+                else -> methodResult.notImplemented()
             }
         }
     }
@@ -81,11 +107,9 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun connectToSled() {
-        // 1. OPEN THE SERIAL/USB PORT FIRST (Fixes "Serial is not exist")
         val openStatus = mReader?.SD_Open()
         Log.d("RFID_DEBUG", "🔓 SD_Open Status: $openStatus")
 
-        // 2. WAKE UP THE SLED MCU
         if (mReader?.SD_GetConnectState() != SDConsts.SDConnectState.CONNECTED) {
             Log.d("RFID_DEBUG", "⏳ Waking up SLED...")
             mReader?.SD_Wakeup()
@@ -109,7 +133,6 @@ class MainActivity: FlutterActivity() {
     override fun onResume() {
         super.onResume()
         setBarcodeKeyMapOn(false)
-        // Try to connect every time we resume the app
         connectToSled()
     }
 
@@ -120,7 +143,6 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onDestroy() {
-        // Safely disconnect AND release the serial port
         mReader?.SD_Disconnect()
         mReader?.SD_Close()
         super.onDestroy()
@@ -140,32 +162,21 @@ class MainActivity: FlutterActivity() {
         mReader?.RF_StopInventory()
     }
 
-    // --- NEW: THE HARDWARE WRITE COMMAND (UPDATED FOR BLUEBIRD SDK) ---
     private fun writeTagEpc(newEpc: String) {
         if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
             Log.d("RFID_DEBUG", "✏️ Attempting to write EPC: $newEpc")
             try {
-                val accessPassword = "00000000" // Default factory password
-
-                // Based on official RFAccessFragment.java:
-                // mReader.RF_WRITE(memType, startPos, data, accessPW, setSelect)
-                // memType = SDConsts.RFMemType.EPC (Bank 1)
-                // startPos = 2 (Skip the 2-word checksum/PC bits)
-                // data = newEpc
-                // setSelect = false (Write to the closest tag without pre-selection filter)
-
+                val accessPassword = "00000000"
                 val result = mReader?.RF_WRITE(SDConsts.RFMemType.EPC, 2, newEpc, accessPassword, false)
                 Log.d("RFID_DEBUG", "Write Command Sent. Immediate Return Code: $result")
-
             } catch (e: Exception) {
                 Log.e("RFID_DEBUG", "❌ Exception during write command", e)
             }
         } else {
             Log.e("RFID_DEBUG", "❌ Cannot write. Sled disconnected.")
-            connectToSled() // Try to reconnect if it fell asleep
+            connectToSled()
         }
     }
-    // ---------------------------------------
 
     private val sledHandler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
@@ -194,24 +205,21 @@ class MainActivity: FlutterActivity() {
                             }
                         }
                     }
-                    // --- NEW: CATCH THE WRITE RESULT ---
                     else if (msg.arg1 == SDConsts.RFCmdMsg.WRITE) {
                         if (msg.arg2 == SDConsts.RFResult.SUCCESS) {
                             Log.d("RFID_DEBUG", "✅ Physical Tag Written Successfully!")
-                            eventSink?.success("STATUS:WRITE_SUCCESS") // Tell Flutter!
+                            eventSink?.success("STATUS:WRITE_SUCCESS")
                         } else {
                             Log.e("RFID_DEBUG", "❌ Physical Tag Write Failed. Make sure tag is close.")
-                            eventSink?.success("STATUS:WRITE_FAILED") // Tell Flutter!
+                            eventSink?.success("STATUS:WRITE_FAILED")
                         }
                     }
-                    // ------------------------------------
                 }
                 SDConsts.Msg.SDMsg -> {
                     if (msg.arg1 == SDConsts.SDCmdMsg.SLED_WAKEUP) {
                         if (msg.arg2 == SDConsts.SDResult.SUCCESS) {
                             Log.d("RFID_DEBUG", "✅ SLED Woke up. Connecting Radio...")
 
-                            // NOW WE CONNECT THE RADIO
                             val connectResult = mReader?.SD_Connect()
 
                             if (connectResult == SDConsts.SDResult.SUCCESS || connectResult == SDConsts.SDResult.ALREADY_CONNECTED) {
@@ -230,6 +238,15 @@ class MainActivity: FlutterActivity() {
                         eventSink?.success("STATUS:STOP")
                         stopInventory()
                     }
+                    // =========================================================
+                    // --- NEW: CATCH SLED BATTERY HARDWARE BROADCAST ---
+                    // =========================================================
+                    else if (msg.arg1 == SDConsts.SDCmdMsg.SLED_BATTERY_STATE_CHANGED) {
+                        val batteryLevel = msg.arg2
+                        Log.d("RFID_DEBUG", "🔋 Sled Battery: $batteryLevel%")
+                        eventSink?.success("BATTERY:$batteryLevel")
+                    }
+                    // =========================================================
                 }
             }
         }

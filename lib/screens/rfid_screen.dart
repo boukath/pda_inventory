@@ -33,6 +33,9 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
 
+  // --- PREMIUM FEATURE: Hardware Power Tracking ---
+  double _currentPower = 30.0;
+
   @override
   void initState() {
     super.initState();
@@ -173,6 +176,142 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     );
   }
 
+  // =================================================================
+  // --- NEW PREMIUM UI: APPLE 2026 GLASSMORPHIC SWIPE CONTROL ---
+  // =================================================================
+  void _showPremiumPowerSlider() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent, // Required for the blur effect
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 50),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    border: Border(top: BorderSide(color: Colors.white.withOpacity(0.4))),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Handle at the top
+                      Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            borderRadius: BorderRadius.circular(10)
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                              "Scanner Range",
+                              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)
+                          ),
+                          Text(
+                              "${_currentPower.toInt()} dBm",
+                              style: GoogleFonts.poppins(fontSize: 18, color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                          "Slide to adjust physical read distance. Lower power helps find single items, max power reads through walls.",
+                          style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 13, height: 1.4)
+                      ),
+                      const SizedBox(height: 32),
+
+                      // THICK SWIPE CAPSULE
+                      LayoutBuilder(
+                          builder: (context, constraints) {
+                            final width = constraints.maxWidth;
+                            const double minPower = 5.0;
+                            const double maxPower = 30.0;
+                            const double range = maxPower - minPower;
+
+                            final double percent = (_currentPower - minPower) / range;
+
+                            return GestureDetector(
+                              onPanUpdate: (details) {
+                                double deltaPercent = details.primaryDelta! / width;
+                                double newPercent = (percent + deltaPercent).clamp(0.0, 1.0);
+                                double newPower = minPower + (newPercent * range);
+
+                                // Vibrate PDA when the number changes
+                                if (newPower.toInt() != _currentPower.toInt()) {
+                                  HapticFeedback.lightImpact();
+                                }
+
+                                setSheetState(() => _currentPower = newPower);
+                                setState(() => _currentPower = newPower);
+                              },
+                              onPanEnd: (details) {
+                                // Tell the hardware!
+                                _methodChannel.invokeMethod('setTxPower', {"power": _currentPower.toInt()});
+                                HapticFeedback.mediumImpact();
+                              },
+                              child: Container(
+                                height: 75, // Extra thick for gloved warehouse hands!
+                                decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(40),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      )
+                                    ]
+                                ),
+                                child: Stack(
+                                  children: [
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 50),
+                                      width: (width * percent).clamp(75.0, width),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                            colors: [Color(0xFF6A11CB), Color(0xFF4A00E0)]
+                                        ),
+                                        borderRadius: BorderRadius.circular(40),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Icon(
+                                          CupertinoIcons.antenna_radiowaves_left_right,
+                                          color: percent > 0.15 ? Colors.white : Colors.grey[600],
+                                          size: 30,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+        );
+      },
+    );
+  }
+  // =================================================================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,6 +321,18 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         backgroundColor: const Color(0xFF1E0045),
         foregroundColor: Colors.white,
         elevation: 0,
+        // --- NEW PREMIUM UI ICON ---
+        actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.slider_horizontal_3, color: Colors.white, size: 28),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              _showPremiumPowerSlider();
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+        // ---------------------------
       ),
       body: Column(
         children: [
