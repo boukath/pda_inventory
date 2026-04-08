@@ -1,13 +1,14 @@
 // File: lib/screens/add_rfid_product_screen.dart
 
 import 'dart:async';
-import 'dart:convert'; // <-- NEW: Required for jsonEncode
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/app_db_helper.dart';
-import '../l10n/app_localizations.dart'; // <-- TRANSLATIONS IMPORT
+import '../l10n/app_localizations.dart';
+import '../utils/epc_generator.dart'; // <-- IMPORT YOUR GENERATOR HERE
 
 class AddRfidProductScreen extends StatefulWidget {
   const AddRfidProductScreen({super.key});
@@ -21,13 +22,14 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid_events');
   static const MethodChannel _methodChannel = MethodChannel('com.pda_inventory/rfid_methods');
   StreamSubscription? _rfidSubscription;
+
   bool _isScanning = false;
+  bool _isWriting = false; // <-- NEW: Tracks if we are currently writing to a tag
 
   // --- PRODUCT TYPE TOGGLE ---
   String _productType = 'retail';
 
-  // --- NEW: DYNAMIC CUSTOM FIELDS MAP ---
-  // This map holds an infinite amount of user-created fields!
+  // --- DYNAMIC CUSTOM FIELDS MAP ---
   final Map<String, TextEditingController> _customFields = {};
 
   // --- FORM CONTROLLERS ---
@@ -71,13 +73,34 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     _setupRfidScanner();
   }
 
+  // --- UPDATED: LISTEN FOR SCAN AND WRITE EVENTS ---
   void _setupRfidScanner() {
     _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
-      final String scannedEpc = event.toString();
-      setState(() {
-        _epcController.text = scannedEpc;
-      });
-      _stopScanning();
+      final String data = event.toString().trim();
+
+      // Check if it's a write response from Android
+      if (data == 'STATUS:WRITE_SUCCESS') {
+        setState(() => _isWriting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tag written successfully!'), backgroundColor: Colors.green)
+          );
+        }
+      } else if (data == 'STATUS:WRITE_FAILED') {
+        setState(() => _isWriting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to write. Move tag closer.'), backgroundColor: Colors.red)
+          );
+        }
+      }
+      // Otherwise, handle it as a scanned tag
+      else if (data.startsWith('TAG:')) {
+        setState(() {
+          _epcController.text = data.replaceFirst('TAG:', '');
+        });
+        _stopScanning();
+      }
     });
   }
 
@@ -91,14 +114,33 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     try { await _methodChannel.invokeMethod('stopScan'); } catch (e) { /* Handle error quietly */ }
   }
 
+  // --- NEW: TRIGGER THE HARDWARE WRITE ---
+  Future<void> _writeToTag() async {
+    String currentEpc = _epcController.text.trim();
+
+    // EPCs must usually be 24 hex characters
+    if (currentEpc.length != 24) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('EPC must be exactly 24 characters!'), backgroundColor: Colors.orange)
+      );
+      return;
+    }
+
+    setState(() => _isWriting = true);
+    try {
+      // Ask Android to write this EPC
+      await _methodChannel.invokeMethod('writeEpc', {"newEpc": currentEpc});
+    } catch (e) {
+      setState(() => _isWriting = false);
+      debugPrint("Write Error: $e");
+    }
+  }
+
   @override
   void dispose() {
     _stopScanning();
     _rfidSubscription?.cancel();
-
-    // Clean up dynamic controllers to prevent memory leaks
     _customFields.forEach((key, controller) => controller.dispose());
-
     super.dispose();
   }
 
@@ -147,7 +189,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
 
   // --- SAVE DATA TO DB ---
   Future<void> _saveProduct() async {
-    // 1. Mandatory Checks
     if (_epcController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context)!.scanEpcWarning), backgroundColor: Colors.red));
       return;
@@ -157,7 +198,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       return;
     }
 
-    // 2. Package dynamic custom fields into JSON
     Map<String, String> customDataMap = {};
     _customFields.forEach((key, controller) {
       if (controller.text.trim().isNotEmpty) {
@@ -166,7 +206,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     });
     String customFieldsJson = jsonEncode(customDataMap);
 
-    // 3. Prepare the massive Enterprise package
     final productData = {
       'epc': _epcController.text,
       'product_type': _productType,
@@ -177,32 +216,26 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       'category': _categoryController.text,
       'sub_category': _subCategoryController.text,
       'description': _descController.text,
-
       'size': _productType == 'retail' ? _sizeController.text : null,
       'color': _productType == 'retail' ? _colorController.text : null,
       'gender_dept': _productType == 'retail' ? _genderController.text : null,
       'season': _productType == 'retail' ? _seasonController.text : null,
       'material': _productType == 'retail' ? _materialController.text : null,
-
       'batch_lot': _productType == 'market' ? _batchController.text : null,
       'production_date': _productType == 'market' ? _prodDateController.text : null,
       'expiration_date': _productType == 'market' ? _expDateController.text : null,
       'weight_volume': _productType == 'market' ? _weightController.text : null,
-
       'supplier_id': _supplierIdController.text,
       'supplier_code': _supplierCodeController.text,
       'cost_price': double.tryParse(_costPriceController.text) ?? 0.0,
       'selling_price': double.tryParse(_sellingPriceController.text) ?? 0.0,
       'discount_price': double.tryParse(_discountController.text) ?? 0.0,
       'tax_rate': double.tryParse(_taxController.text) ?? 0.0,
-
       'store_location_id': _locationController.text,
       'zone_aisle': _zoneController.text,
       'stock_quantity': int.tryParse(_stockController.text) ?? 0,
       'reorder_level': int.tryParse(_reorderController.text) ?? 0,
       'date_added': DateTime.now().toIso8601String(),
-
-      // The Magic JSON Column!
       'custom_fields': customFieldsJson,
     };
 
@@ -225,11 +258,11 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. HARDWARE SCANNER SECTION
+          // 1. HARDWARE SCANNER & WRITER SECTION
           _buildHardwareCard(context),
           const SizedBox(height: 20),
 
-          // 2. THE NEW TYPE TOGGLE SWITCH
+          // 2. THE TYPE TOGGLE SWITCH
           _buildTypeToggle(context),
           const SizedBox(height: 20),
 
@@ -295,7 +328,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               ]
           ),
 
-          // 8. THE NEW DYNAMIC CUSTOM FIELDS SECTION
+          // 8. DYNAMIC CUSTOM FIELDS SECTION
           _buildDynamicFieldsSection(context),
 
           const SizedBox(height: 30),
@@ -319,6 +352,90 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
 
   // --- WIDGET BUILDERS ---
 
+  Widget _buildHardwareCard(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF4A00E0), width: 2)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(Icons.wifi_tethering, size: 40, color: _isScanning ? Colors.red : const Color(0xFF4A00E0)),
+            const SizedBox(height: 10),
+            Text(AppLocalizations.of(context)!.hardwareTagLink, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+
+            // --- UPDATED EPC FIELD ---
+            TextField(
+              controller: _epcController,
+              maxLength: 24, // Enforce 24 characters
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.scannedEpcCode,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(CupertinoIcons.tag_solid),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.autorenew, color: Color(0xFF4A00E0)),
+                  tooltip: "Generate Random EPC",
+                  onPressed: () {
+                    setState(() {
+                      // Uses the generator you created in epc_generator.dart
+                      _epcController.text = EpcGenerator.generateRandomEpc();
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // --- UPDATED HARDWARE BUTTONS ---
+            Row(
+              children: [
+                // SCAN BUTTON
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isScanning ? Colors.red : Colors.grey[800],
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: Icon(_isScanning ? Icons.stop : Icons.sensors, color: Colors.white),
+                    label: Text(
+                        _isScanning ? AppLocalizations.of(context)!.stopScanning : "Read Tag",
+                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
+                    ),
+                    onPressed: _isScanning ? _stopScanning : _startScanning,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // WRITE BUTTON
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A00E0),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: _isWriting
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.edit_note, color: Colors.white),
+                    label: Text(
+                        "Write Tag",
+                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
+                    ),
+                    onPressed: _isWriting ? null : _writeToTag,
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDynamicFieldsSection(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -337,8 +454,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // Loop through map to draw existing dynamic fields
             ..._customFields.entries.map((entry) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
@@ -348,7 +463,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                       child: TextField(
                         controller: entry.value,
                         decoration: InputDecoration(
-                          labelText: entry.key, // The custom name they typed!
+                          labelText: entry.key,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
@@ -356,14 +471,12 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                     ),
                     IconButton(
                       icon: const Icon(CupertinoIcons.trash, color: Colors.red),
-                      onPressed: () => _deleteCustomField(entry.key), // Deletes the field
+                      onPressed: () => _deleteCustomField(entry.key),
                     )
                   ],
                 ),
               );
             }),
-
-            // Add Field Button
             Center(
               child: TextButton.icon(
                 onPressed: _showAddCustomFieldDialog,
@@ -405,51 +518,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
             setState(() { _productType = value; });
           }
         },
-      ),
-    );
-  }
-
-  Widget _buildHardwareCard(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFF4A00E0), width: 2)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(Icons.wifi_tethering, size: 40, color: _isScanning ? Colors.red : const Color(0xFF4A00E0)),
-            const SizedBox(height: 10),
-            Text(AppLocalizations.of(context)!.hardwareTagLink, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _epcController,
-              readOnly: true,
-              decoration: InputDecoration(
-                labelText: AppLocalizations.of(context)!.scannedEpcCode,
-                filled: true,
-                fillColor: Colors.grey[200],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(CupertinoIcons.tag_solid),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isScanning ? Colors.red : const Color(0xFF4A00E0),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _isScanning ? _stopScanning : _startScanning,
-                child: Text(
-                    _isScanning ? AppLocalizations.of(context)!.stopScanning : AppLocalizations.of(context)!.scanRfidLabel,
-                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
-                ),
-              ),
-            )
-          ],
-        ),
       ),
     );
   }

@@ -54,6 +54,17 @@ class MainActivity: FlutterActivity() {
                     stopInventory()
                     result.success(null)
                 }
+                // --- NEW: LISTEN FOR WRITE COMMAND FROM FLUTTER ---
+                "writeEpc" -> {
+                    val newEpc = call.argument<String>("newEpc")
+                    if (newEpc != null && newEpc.length % 4 == 0) {
+                        writeTagEpc(newEpc)
+                        result.success(true)
+                    } else {
+                        result.error("INVALID_EPC", "EPC must be a valid hex string of proper length", null)
+                    }
+                }
+                // --------------------------------------------------
                 else -> result.notImplemented()
             }
         }
@@ -129,6 +140,33 @@ class MainActivity: FlutterActivity() {
         mReader?.RF_StopInventory()
     }
 
+    // --- NEW: THE HARDWARE WRITE COMMAND (UPDATED FOR BLUEBIRD SDK) ---
+    private fun writeTagEpc(newEpc: String) {
+        if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
+            Log.d("RFID_DEBUG", "✏️ Attempting to write EPC: $newEpc")
+            try {
+                val accessPassword = "00000000" // Default factory password
+
+                // Based on official RFAccessFragment.java:
+                // mReader.RF_WRITE(memType, startPos, data, accessPW, setSelect)
+                // memType = SDConsts.RFMemType.EPC (Bank 1)
+                // startPos = 2 (Skip the 2-word checksum/PC bits)
+                // data = newEpc
+                // setSelect = false (Write to the closest tag without pre-selection filter)
+
+                val result = mReader?.RF_WRITE(SDConsts.RFMemType.EPC, 2, newEpc, accessPassword, false)
+                Log.d("RFID_DEBUG", "Write Command Sent. Immediate Return Code: $result")
+
+            } catch (e: Exception) {
+                Log.e("RFID_DEBUG", "❌ Exception during write command", e)
+            }
+        } else {
+            Log.e("RFID_DEBUG", "❌ Cannot write. Sled disconnected.")
+            connectToSled() // Try to reconnect if it fell asleep
+        }
+    }
+    // ---------------------------------------
+
     private val sledHandler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
@@ -156,6 +194,17 @@ class MainActivity: FlutterActivity() {
                             }
                         }
                     }
+                    // --- NEW: CATCH THE WRITE RESULT ---
+                    else if (msg.arg1 == SDConsts.RFCmdMsg.WRITE) {
+                        if (msg.arg2 == SDConsts.RFResult.SUCCESS) {
+                            Log.d("RFID_DEBUG", "✅ Physical Tag Written Successfully!")
+                            eventSink?.success("STATUS:WRITE_SUCCESS") // Tell Flutter!
+                        } else {
+                            Log.e("RFID_DEBUG", "❌ Physical Tag Write Failed. Make sure tag is close.")
+                            eventSink?.success("STATUS:WRITE_FAILED") // Tell Flutter!
+                        }
+                    }
+                    // ------------------------------------
                 }
                 SDConsts.Msg.SDMsg -> {
                     if (msg.arg1 == SDConsts.SDCmdMsg.SLED_WAKEUP) {
