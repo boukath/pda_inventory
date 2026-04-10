@@ -25,7 +25,6 @@ dependencies:
   path_provider: ^2.1.5
   permission_handler: ^12.0.1
 
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -36,11 +35,21 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
-   - assets/boitexinfo+tn.png
-   - assets/sounds/beep.mp3
+    - assets/boitexinfo+tn.png
+    - assets/sounds/beep.mp3
+
+  # --- NEW: OFFLINE FONTS FOR PDA ---
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
 
 flutter_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/delivery-list_18435364.png" # <-- This points to your image!
+  image_path: "assets/delivery-list_18435364.png"

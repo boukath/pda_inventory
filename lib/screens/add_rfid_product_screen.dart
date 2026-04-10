@@ -118,17 +118,33 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   Future<void> _writeToTag() async {
     String currentEpc = _epcController.text.trim();
 
-    // EPCs must usually be 24 hex characters
-    if (currentEpc.length != 24) {
+    // We removed the strict 24-character limit!
+
+    // Optional Safety Check: RFID tags write data in Hexadecimal format.
+    // Hex pairs usually require an *even* number of characters (e.g., 28, 36).
+    // If the user enters an odd number (like 7 characters), it might fail on the hardware side.
+    if (currentEpc.isNotEmpty && currentEpc.length % 2 != 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('EPC must be exactly 24 characters!'), backgroundColor: Colors.orange)
+          const SnackBar(
+              content: Text('Note: RFID codes usually require an even number of characters.'),
+              backgroundColor: Colors.orange
+          )
       );
-      return;
+      // We are just showing a warning, but we still allow the write attempt to proceed!
+    }
+
+    if (currentEpc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Attempting to write an empty tag...'),
+              backgroundColor: Colors.blue
+          )
+      );
     }
 
     setState(() => _isWriting = true);
     try {
-      // Ask Android to write this EPC
+      // Ask Android to write this EPC (whatever length it is)
       await _methodChannel.invokeMethod('writeEpc', {"newEpc": currentEpc});
     } catch (e) {
       setState(() => _isWriting = false);
@@ -368,7 +384,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
             // --- UPDATED EPC FIELD ---
             TextField(
               controller: _epcController,
-              maxLength: 24, // Enforce 24 characters
+              // maxLength: 24, // <-- REMOVE OR COMMENT OUT THIS LINE!
               textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
                 labelText: AppLocalizations.of(context)!.scannedEpcCode,
@@ -381,7 +397,6 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                   tooltip: "Generate Random EPC",
                   onPressed: () {
                     setState(() {
-                      // Uses the generator you created in epc_generator.dart
                       _epcController.text = EpcGenerator.generateRandomEpc();
                     });
                   },

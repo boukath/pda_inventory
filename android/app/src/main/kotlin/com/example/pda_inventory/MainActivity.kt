@@ -22,6 +22,12 @@ class MainActivity: FlutterActivity() {
     private var eventSink: EventChannel.EventSink? = null
     private var mReader: Reader? = null
 
+    // =========================================================
+    // --- OPTIMIZATION: Pre-allocate memory for 2048 tags ---
+    // Prevents the HashSet from pausing to resize itself during heavy scans
+    // =========================================================
+    private val scannedTags = HashSet<String>(2048)
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -56,7 +62,7 @@ class MainActivity: FlutterActivity() {
                 }
                 "writeEpc" -> {
                     val newEpc = call.argument<String>("newEpc")
-                    if (newEpc != null && newEpc.length % 4 == 0) {
+                    if (newEpc != null) {
                         writeTagEpc(newEpc)
                         methodResult.success(true)
                     } else {
@@ -79,9 +85,6 @@ class MainActivity: FlutterActivity() {
                         methodResult.error("DISCONNECTED", "Sled is not connected", null)
                     }
                 }
-                // =========================================================
-                // --- NEW: FETCH SLED BATTERY COMMAND FROM FLUTTER ---
-                // =========================================================
                 "getBattery" -> {
                     if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
                         mReader?.SD_GetBatteryStatus() // Asks hardware to broadcast battery
@@ -90,7 +93,6 @@ class MainActivity: FlutterActivity() {
                         methodResult.error("DISCONNECTED", "Sled is not connected", null)
                     }
                 }
-                // =========================================================
                 else -> methodResult.notImplemented()
             }
         }
@@ -150,6 +152,7 @@ class MainActivity: FlutterActivity() {
 
     private fun startInventory() {
         if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
+            scannedTags.clear()
             val result = mReader?.RF_PerformInventory(true, false, false)
             Log.d("RFID_DEBUG", "✅ Software Scan Triggered (Result: $result)")
         } else {
@@ -165,13 +168,17 @@ class MainActivity: FlutterActivity() {
     private fun writeTagEpc(newEpc: String) {
         if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
             Log.d("RFID_DEBUG", "✏️ Attempting to write EPC: $newEpc")
-            try {
-                val accessPassword = "00000000"
-                val result = mReader?.RF_WRITE(SDConsts.RFMemType.EPC, 2, newEpc, accessPassword, false)
-                Log.d("RFID_DEBUG", "Write Command Sent. Immediate Return Code: $result")
-            } catch (e: Exception) {
-                Log.e("RFID_DEBUG", "❌ Exception during write command", e)
-            }
+
+            Thread {
+                try {
+                    val accessPassword = "00000000"
+                    val result = mReader?.RF_WRITE(SDConsts.RFMemType.EPC, 2, newEpc, accessPassword, false)
+                    Log.d("RFID_DEBUG", "Write Command Sent. Immediate Return Code: $result")
+                } catch (e: Exception) {
+                    Log.e("RFID_DEBUG", "❌ Exception during write command", e)
+                }
+            }.start()
+
         } else {
             Log.e("RFID_DEBUG", "❌ Cannot write. Sled disconnected.")
             connectToSled()
@@ -185,27 +192,38 @@ class MainActivity: FlutterActivity() {
                     if (msg.arg1 == SDConsts.RFCmdMsg.INVENTORY || msg.arg1 == SDConsts.RFCmdMsg.READ) {
                         if (msg.arg2 == SDConsts.RFResult.SUCCESS) {
                             val rawData = msg.obj?.toString()
-                            if (!rawData.isNullOrEmpty()) {
-                                val parts = rawData.split(";")
-                                var cleanEpc = ""
+                            if (rawData != null && rawData.isNotEmpty()) {
 
-                                for (dt in parts) {
-                                    if (dt.startsWith("epcdc:")) {
-                                        cleanEpc = dt.replace("epcdc:", "").trim()
+                                // =========================================================
+                                // --- HYPER-FAST PARSING: No split(), no replace() array creation ---
+                                // =========================================================
+                                var cleanEpc = ""
+                                val epcIndex = rawData.indexOf("epcdc:")
+
+                                if (epcIndex != -1) {
+                                    val start = epcIndex + 6 // Jump past "epcdc:"
+                                    var end = rawData.indexOf(';', start)
+                                    if (end == -1) end = rawData.length
+                                    cleanEpc = rawData.substring(start, end).trim()
+                                } else {
+                                    var end = rawData.indexOf(';')
+                                    if (end == -1) end = rawData.length
+                                    val tempString = rawData.substring(0, end).trim()
+
+                                    if (!tempString.startsWith("rssi:") && !tempString.startsWith("loc:")) {
+                                        cleanEpc = tempString
                                     }
                                 }
 
-                                if (cleanEpc.isEmpty()) {
-                                    cleanEpc = parts.firstOrNull { !it.startsWith("rssi:") && !it.startsWith("loc:") }?.trim() ?: ""
-                                }
-
                                 if (cleanEpc.isNotEmpty()) {
-                                    eventSink?.success("TAG:$cleanEpc")
+                                    if (scannedTags.add(cleanEpc)) {
+                                        eventSink?.success("TAG:$cleanEpc")
+                                    }
                                 }
                             }
                         }
                     }
-                    else if (msg.arg1 == SDConsts.RFCmdMsg.WRITE) {
+                    else if (msg.arg1 == SDConsts.RFCmdMsg.WRITE || msg.arg1 == SDConsts.RFCmdMsg.WRITE_TAG_ID) {
                         if (msg.arg2 == SDConsts.RFResult.SUCCESS) {
                             Log.d("RFID_DEBUG", "✅ Physical Tag Written Successfully!")
                             eventSink?.success("STATUS:WRITE_SUCCESS")
@@ -238,15 +256,11 @@ class MainActivity: FlutterActivity() {
                         eventSink?.success("STATUS:STOP")
                         stopInventory()
                     }
-                    // =========================================================
-                    // --- NEW: CATCH SLED BATTERY HARDWARE BROADCAST ---
-                    // =========================================================
                     else if (msg.arg1 == SDConsts.SDCmdMsg.SLED_BATTERY_STATE_CHANGED) {
                         val batteryLevel = msg.arg2
                         Log.d("RFID_DEBUG", "🔋 Sled Battery: $batteryLevel%")
                         eventSink?.success("BATTERY:$batteryLevel")
                     }
-                    // =========================================================
                 }
             }
         }

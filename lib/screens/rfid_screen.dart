@@ -56,6 +56,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       String data = event.toString().trim();
 
       if (data == 'STATUS:START') {
+        HapticFeedback.lightImpact(); // INSTANT physical feedback when trigger pulled
         if (mounted) setState(() => _isScanning = true);
         return;
       } else if (data == 'STATUS:STOP') {
@@ -89,43 +90,41 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _processScannedTag(String tag) async {
-    // 1. If we already scanned this exact tag in this session, ignore it (no extra beeps)
+  // --- OPTIMIZATION: Removed 'async' to prevent blocking the UI thread! ---
+  void _processScannedTag(String tag) {
     if (_uniquePhysicalTags.contains(tag)) return;
 
-    // 2. Play the beep sound for the newly discovered tag!
-    try {
-      // Note: For audioplayers v3.0+, AssetSource assumes the file is inside the "assets/" folder
-      await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
-    } catch (e) {
+    // 1. FIRE AND FORGET AUDIO: Play the sound instantly without awaiting
+    _audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((e) {
       debugPrint("Audio error: $e");
-    }
+    });
 
-    // 3. Continue with existing logic
-    _uniquePhysicalTags.add(tag);
-    _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
+    // 2. INSTANT UI UPDATE: Update the counts on the screen immediately
+    setState(() {
+      _uniquePhysicalTags.add(tag);
+      _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
+    });
 
-    setState(() {});
-
+    // 3. BACKGROUND DATABASE FETCH: Fetch data without pausing the scanner
     if (!_productCache.containsKey(tag)) {
-      final product = await DatabaseHelper.instance.getProductByBarcode(tag);
-      if (mounted) {
-        setState(() {
-          _productCache[tag] = product;
-        });
-      }
+      DatabaseHelper.instance.getProductByBarcode(tag).then((product) {
+        if (mounted) {
+          setState(() {
+            _productCache[tag] = product;
+          });
+        }
+      });
     }
   }
 
   void _toggleScanning() {
-    setState(() {
-      _isScanning = !_isScanning;
-    });
-
+    HapticFeedback.lightImpact(); // Software button also gets instant feedback
     if (_isScanning) {
-      _methodChannel.invokeMethod('startScan');
-    } else {
       _methodChannel.invokeMethod('stopScan');
+      setState(() => _isScanning = false);
+    } else {
+      _methodChannel.invokeMethod('startScan');
+      setState(() => _isScanning = true);
     }
   }
 
