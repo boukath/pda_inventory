@@ -11,7 +11,7 @@ import '../database/db_helper.dart';
 import '../models/product.dart';
 import '../l10n/app_localizations.dart';
 import 'rfid_review_screen.dart';
-
+import '../database/app_db_helper.dart';
 class RfidScreen extends StatefulWidget {
   const RfidScreen({super.key});
 
@@ -107,10 +107,31 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
     // 3. BACKGROUND DATABASE FETCH: Fetch data without pausing the scanner
     if (!_productCache.containsKey(tag)) {
-      DatabaseHelper.instance.getProductByBarcode(tag).then((product) {
-        if (mounted) {
-          setState(() {
-            _productCache[tag] = product;
+
+      // FIRST: Check the Enterprise Database
+      AppDatabaseHelper.instance.getEnterpriseProductByEpc(tag).then((enterpriseData) {
+        if (enterpriseData != null) {
+          // If found, convert the Enterprise Map into a Product object
+          final product = Product(
+            barcode: enterpriseData['epc'] ?? tag,
+            name: enterpriseData['product_name'] ?? 'Unknown',
+            price: (enterpriseData['selling_price'] ?? 0).toDouble(),
+            costPrice: (enterpriseData['cost_price'] ?? 0).toDouble(),
+            category: enterpriseData['category'] ?? '',
+            stock: enterpriseData['stock_quantity'] ?? 0,
+            lastUpdated: enterpriseData['date_added'] ?? DateTime.now().toIso8601String(),
+          );
+
+          if (mounted) setState(() => _productCache[tag] = product);
+
+        } else {
+          // SECOND: Fallback to the Minimarket Database if not found in Enterprise
+          DatabaseHelper.instance.getProductByBarcode(tag).then((product) {
+            if (mounted) {
+              setState(() {
+                _productCache[tag] = product;
+              });
+            }
           });
         }
       });

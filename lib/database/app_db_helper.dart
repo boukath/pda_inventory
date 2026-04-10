@@ -132,4 +132,19 @@ class AppDatabaseHelper {
     // Order them so the newest additions show up at the top of the list!
     return await db.query('enterprise_products', orderBy: 'date_added DESC');
   }
+
+  // --- FETCH A SINGLE PRODUCT BY EPC ---
+  Future<Map<String, dynamic>?> getEnterpriseProductByEpc(String epc) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'enterprise_products',
+      where: 'epc = ?',
+      whereArgs: [epc],
+    );
+
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null; // Return null if the tag isn't found
+  }
 }

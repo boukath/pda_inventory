@@ -69,17 +69,33 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
   }
 
   Future<void> _reconcileInventory() async {
-    // 1. Fetch ALL products from the database to see what we *should* have
-    final List<Product> allDbProducts = await DatabaseHelper.instance.getProducts();
+    // 1. Fetch products from the old Minimarket DB
+    List<Product> expectedProducts = await DatabaseHelper.instance.getProducts();
 
-    // Convert to a Map for extremely fast lookups
+    // 2. Fetch products from the new Enterprise DB
+    List<Map<String, dynamic>> enterpriseData = await AppDatabaseHelper.instance.getAllEnterpriseProducts();
+
+    // 3. Convert the Enterprise Maps into Product objects and add them to the unified list!
+    for (var ep in enterpriseData) {
+      expectedProducts.add(Product(
+        barcode: ep['epc'] ?? '',
+        name: ep['product_name'] ?? 'Unknown',
+        price: (ep['selling_price'] ?? 0).toDouble(),
+        costPrice: (ep['cost_price'] ?? 0).toDouble(),
+        category: ep['category'] ?? '',
+        stock: ep['stock_quantity'] ?? 0,
+        lastUpdated: ep['date_added'] ?? DateTime.now().toIso8601String(),
+      ));
+    }
+
+    // Convert to a Map for extremely fast lookups using the UNIFIED list
     final Map<String, Product> dbMap = {
-      for (var p in allDbProducts) p.barcode: p
+      for (var p in expectedProducts) p.barcode: p
     };
 
     List<ReviewItem> items = [];
 
-    // 2. Loop through everything we actually scanned
+    // 4. Loop through everything we actually scanned
     widget.scannedCounts.forEach((barcode, scannedQty) {
       if (dbMap.containsKey(barcode)) {
         // We know this product!
@@ -105,7 +121,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
       }
     });
 
-    // 3. Anything left in dbMap was NEVER SCANNED! (100% missing)
+    // 5. Anything left in dbMap was NEVER SCANNED! (100% missing)
     dbMap.forEach((barcode, product) {
       if (product.stock > 0) {
         items.add(ReviewItem(
@@ -118,7 +134,7 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
       }
     });
 
-    // 4. Calculate Summary Dashboard Numbers
+    // 6. Calculate Summary Dashboard Numbers
     for (var item in items) {
       if (item.status == 'match') _totalMatched++;
       else if (item.status == 'missing') _totalMissing++;
@@ -148,13 +164,25 @@ class _RfidReviewScreenState extends State<RfidReviewScreen> {
       await AppDatabaseHelper.instance.saveScannedEpc(epc);
     }
 
-    // 2. Update the Main Product Database for quantities (Reconciliation)
+    // 2. Smartly Update the Main Product Databases for quantities
     for (var item in _reviewItems) {
       if (item.productRef != null && item.variance != 0) {
-        Product updatedProduct = item.productRef!.copyWith(
-          stock: item.scannedQty,
-        );
-        await DatabaseHelper.instance.updateProduct(updatedProduct);
+
+        // Check if this product belongs to the Enterprise database
+        final enterpriseProduct = await AppDatabaseHelper.instance.getEnterpriseProductByEpc(item.barcode);
+
+        if (enterpriseProduct != null) {
+          // Update Enterprise DB
+          Map<String, dynamic> updatedData = Map<String, dynamic>.from(enterpriseProduct);
+          updatedData['stock_quantity'] = item.scannedQty;
+          await AppDatabaseHelper.instance.insertEnterpriseProduct(updatedData);
+        } else {
+          // Update Minimarket DB
+          Product updatedProduct = item.productRef!.copyWith(
+            stock: item.scannedQty,
+          );
+          await DatabaseHelper.instance.updateProduct(updatedProduct);
+        }
       }
     }
 

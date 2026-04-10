@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/app_db_helper.dart';
+import '../database/db_helper.dart'; // <-- ADD THIS IMPORT
 
 class RfidInventoryScreen extends StatefulWidget {
   const RfidInventoryScreen({super.key});
@@ -15,10 +16,10 @@ class RfidInventoryScreen extends StatefulWidget {
 class _RfidInventoryScreenState extends State<RfidInventoryScreen> {
   bool _isLoading = true;
   int _totalEpcs = 0;
-
-  // This Map will group our tags.
-  // The Key is the "Date/Time", the Value is the List of EPCs scanned then.
   Map<String, List<String>> _groupedSessions = {};
+
+  // --- NEW: Cache for EPC to Product Names ---
+  Map<String, String> _productNames = {};
 
   @override
   void initState() {
@@ -31,34 +32,53 @@ class _RfidInventoryScreenState extends State<RfidInventoryScreen> {
 
     Map<String, List<String>> grouped = {};
     int totalCount = 0;
+    Set<String> uniqueEpcsToFetch = {}; // Keep track of unique tags to avoid duplicate DB calls
 
     for (var row in rawTags) {
       String epc = row['epc'] as String;
-      // If it's an old tag without a time, default to 'Unknown Time'
-      String timeStr = row['scanTime'] as String? ?? '';
 
-      String sessionTitle = "Legacy Scans (No Time)";
-      if (timeStr.isNotEmpty) {
-        DateTime dt = DateTime.parse(timeStr);
-        // Format string to look like: "2026-04-07 at 14:30"
-        String date = "${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}";
-        String time = "${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}";
-        sessionTitle = "$date  at  $time";
-      }
+      // Group tags by date (Extract YYYY-MM-DD from ISO string)
+      String timeStr = row['scanTime'] ?? DateTime.now().toIso8601String();
+      DateTime dt = DateTime.parse(timeStr);
+      String sessionDate = "${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}";
 
-      // Add the tag to its specific date/time group!
-      if (!grouped.containsKey(sessionTitle)) {
-        grouped[sessionTitle] = [];
+      if (!grouped.containsKey(sessionDate)) {
+        grouped[sessionDate] = [];
       }
-      grouped[sessionTitle]!.add(epc);
+      grouped[sessionDate]!.add(epc);
       totalCount++;
+      uniqueEpcsToFetch.add(epc);
     }
 
-    setState(() {
-      _groupedSessions = grouped;
-      _totalEpcs = totalCount;
-      _isLoading = false;
-    });
+    // --- NEW: FETCH PRODUCT NAMES FROM BOTH DATABASES ---
+    Map<String, String> resolvedNames = {};
+
+    for (String epc in uniqueEpcsToFetch) {
+      // 1. Check Enterprise DB First
+      final enterpriseData = await AppDatabaseHelper.instance.getEnterpriseProductByEpc(epc);
+
+      if (enterpriseData != null) {
+        resolvedNames[epc] = enterpriseData['product_name'] ?? 'Unknown Tag';
+      } else {
+        // 2. Check Minimarket DB Fallback
+        final minimarketProduct = await DatabaseHelper.instance.getProductByBarcode(epc);
+        if (minimarketProduct != null) {
+          resolvedNames[epc] = minimarketProduct.name;
+        } else {
+          resolvedNames[epc] = 'Unknown Tag';
+        }
+      }
+    }
+
+    // Update the UI once all database checks are complete!
+    if (mounted) {
+      setState(() {
+        _groupedSessions = grouped;
+        _totalEpcs = totalCount;
+        _productNames = resolvedNames; // Save the fetched names!
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _clearData() async {
@@ -194,8 +214,12 @@ class _RfidInventoryScreenState extends State<RfidInventoryScreen> {
             ),
             child: ListTile(
               leading: const Icon(CupertinoIcons.tag_solid, color: Colors.grey, size: 20),
-              title: Text(epc, style: GoogleFonts.poppins(fontSize: 13, letterSpacing: 1.0)),
-              trailing: const Icon(Icons.check, color: Colors.green, size: 16),
+              // --- NEW: Show Product Name instead of just EPC ---
+              title: Text(
+                  _productNames[epc] != 'Unknown Tag' ? _productNames[epc]! : "Unknown Tag",
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold)
+              ),
+              subtitle: Text(epc, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
             ),
           );
         }).toList(),
