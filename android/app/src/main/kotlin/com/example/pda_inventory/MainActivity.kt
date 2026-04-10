@@ -22,6 +22,9 @@ class MainActivity: FlutterActivity() {
     private var eventSink: EventChannel.EventSink? = null
     private var mReader: Reader? = null
 
+    // --- NEW: Tracks the specific tag we are looking for in Radar Mode ---
+    private var locatorTargetEpc: String? = null
+
     // =========================================================
     // --- OPTIMIZATION: Pre-allocate memory for 2048 tags ---
     // Prevents the HashSet from pausing to resize itself during heavy scans
@@ -60,6 +63,22 @@ class MainActivity: FlutterActivity() {
                     stopInventory()
                     methodResult.success(null)
                 }
+                // ==========================================
+                // --- NEW: LOCATOR MODE COMMANDS ---
+                // ==========================================
+                "startLocator" -> {
+                    locatorTargetEpc = call.argument<String>("targetEpc")
+                    Log.d("RFID_DEBUG", "🎯 Locator Mode Started for Target: $locatorTargetEpc")
+                    startInventory()
+                    methodResult.success(null)
+                }
+                "stopLocator" -> {
+                    locatorTargetEpc = null
+                    Log.d("RFID_DEBUG", "🛑 Locator Mode Stopped")
+                    stopInventory()
+                    methodResult.success(null)
+                }
+                // ==========================================
                 "writeEpc" -> {
                     val newEpc = call.argument<String>("newEpc")
                     if (newEpc != null) {
@@ -194,14 +213,15 @@ class MainActivity: FlutterActivity() {
                             val rawData = msg.obj?.toString()
                             if (rawData != null && rawData.isNotEmpty()) {
 
-                                // =========================================================
-                                // --- HYPER-FAST PARSING: No split(), no replace() array creation ---
-                                // =========================================================
                                 var cleanEpc = ""
-                                val epcIndex = rawData.indexOf("epcdc:")
+                                var rssiVal = -90 // Default weak signal
 
+                                // =========================================================
+                                // 1. PARSE EPC (Extremely fast manual string parsing)
+                                // =========================================================
+                                val epcIndex = rawData.indexOf("epcdc:")
                                 if (epcIndex != -1) {
-                                    val start = epcIndex + 6 // Jump past "epcdc:"
+                                    val start = epcIndex + 6
                                     var end = rawData.indexOf(';', start)
                                     if (end == -1) end = rawData.length
                                     cleanEpc = rawData.substring(start, end).trim()
@@ -215,10 +235,33 @@ class MainActivity: FlutterActivity() {
                                     }
                                 }
 
+                                // =========================================================
+                                // 2. PARSE RSSI (For Locator Mode)
+                                // =========================================================
+                                val rssiIndex = rawData.indexOf("rssi:")
+                                if (rssiIndex != -1) {
+                                    val start = rssiIndex + 5
+                                    var end = rawData.indexOf(';', start)
+                                    if (end == -1) end = rawData.length
+                                    val rssiStr = rawData.substring(start, end).trim()
+                                    // Hardware sometimes sends floats like "-45.2", we just want the int "-45"
+                                    rssiVal = rssiStr.substringBefore('.').toIntOrNull() ?: -90
+                                }
+
+                                // =========================================================
+                                // 3. ROUTING LOGIC (Locator vs Standard Scan)
+                                // =========================================================
                                 if (cleanEpc.isNotEmpty()) {
-                                    if (scannedTags.add(cleanEpc)) {
-                                        eventSink?.success("TAG:$cleanEpc")
+                                    if (locatorTargetEpc != null && cleanEpc.equals(locatorTargetEpc, ignoreCase = true)) {
+                                        // A. LOCATOR MODE: Target found! Send continuously with RSSI, bypass HashSet
+                                        eventSink?.success("$cleanEpc,$rssiVal")
+                                    } else if (locatorTargetEpc == null) {
+                                        // B. STANDARD INVENTORY: Deduplicate using HashSet and send "TAG:" prefix
+                                        if (scannedTags.add(cleanEpc)) {
+                                            eventSink?.success("TAG:$cleanEpc")
+                                        }
                                     }
+                                    // Note: If locatorTargetEpc IS set, but this tag is NOT the target, Android ignores it.
                                 }
                             }
                         }

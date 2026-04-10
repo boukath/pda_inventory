@@ -12,6 +12,7 @@ import '../models/product.dart';
 import '../l10n/app_localizations.dart';
 import 'rfid_review_screen.dart';
 import '../database/app_db_helper.dart';
+
 class RfidScreen extends StatefulWidget {
   const RfidScreen({super.key});
 
@@ -33,6 +34,10 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
 
+  // --- NEW: Audio Silence Detector Variables ---
+  Timer? _tagTimeoutTimer;
+  bool _isAudioPlaying = false;
+
   // --- PREMIUM FEATURE: Hardware Power Tracking ---
   double _currentPower = 30.0;
 
@@ -45,6 +50,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     )..repeat(reverse: false);
 
     _audioPlayer.setVolume(1.0);
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
 
     // FLUTTER COMMANDS THE HARDWARE TO BOOT UP
     _methodChannel.invokeMethod('connectHardware');
@@ -56,10 +62,12 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       String data = event.toString().trim();
 
       if (data == 'STATUS:START') {
-        HapticFeedback.lightImpact(); // INSTANT physical feedback when trigger pulled
+        HapticFeedback.lightImpact(); // INSTANT physical feedback
+        // Note: We DO NOT play audio here anymore! We wait for tags.
         if (mounted) setState(() => _isScanning = true);
         return;
       } else if (data == 'STATUS:STOP') {
+        _stopAudioLoop(); // Stop sound on trigger release
         if (mounted) setState(() => _isScanning = false);
         return;
       }
@@ -68,6 +76,19 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         if (!_isScanning) {
           if (mounted) setState(() => _isScanning = true);
         }
+
+        // --- NEW: START AUDIO & RESET SILENCE TIMER ---
+        if (!_isAudioPlaying) {
+          _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+          _isAudioPlaying = true;
+        }
+
+        // Reset the timer. If 250ms pass without a new tag, pause the sound!
+        _tagTimeoutTimer?.cancel();
+        _tagTimeoutTimer = Timer(const Duration(milliseconds: 250), () {
+          _stopAudioLoop();
+        });
+        // ----------------------------------------------
 
         String scannedTag = data.replaceAll('TAG:', '');
         if (scannedTag.isNotEmpty) {
@@ -79,6 +100,15 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     });
   }
 
+  // Helper method to safely stop the sound
+  void _stopAudioLoop() {
+    _tagTimeoutTimer?.cancel();
+    if (_isAudioPlaying) {
+      _audioPlayer.pause();
+      _isAudioPlaying = false;
+    }
+  }
+
   @override
   void dispose() {
     // FLUTTER COMMANDS THE HARDWARE TO GO TO SLEEP
@@ -86,26 +116,21 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
     _rfidSubscription?.cancel();
     _pulseController.dispose();
+    _stopAudioLoop();
     _audioPlayer.dispose();
     super.dispose();
   }
 
-  // --- OPTIMIZATION: Removed 'async' to prevent blocking the UI thread! ---
   void _processScannedTag(String tag) {
     if (_uniquePhysicalTags.contains(tag)) return;
 
-    // 1. FIRE AND FORGET AUDIO: Play the sound instantly without awaiting
-    _audioPlayer.play(AssetSource('sounds/beep.mp3')).catchError((e) {
-      debugPrint("Audio error: $e");
-    });
-
-    // 2. INSTANT UI UPDATE: Update the counts on the screen immediately
+    // 1. INSTANT UI UPDATE: Update the counts on the screen immediately
     setState(() {
       _uniquePhysicalTags.add(tag);
       _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
     });
 
-    // 3. BACKGROUND DATABASE FETCH: Fetch data without pausing the scanner
+    // 2. BACKGROUND DATABASE FETCH: Fetch data without pausing the scanner
     if (!_productCache.containsKey(tag)) {
 
       // FIRST: Check the Enterprise Database
@@ -142,9 +167,11 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     HapticFeedback.lightImpact(); // Software button also gets instant feedback
     if (_isScanning) {
       _methodChannel.invokeMethod('stopScan');
+      _stopAudioLoop(); // Stop audio if software button pressed
       setState(() => _isScanning = false);
     } else {
       _methodChannel.invokeMethod('startScan');
+      // Note: Audio will automatically start when the first tag hits the listener!
       setState(() => _isScanning = true);
     }
   }
@@ -163,6 +190,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       _isScanning = false;
     });
     _methodChannel.invokeMethod('stopScan');
+    _stopAudioLoop(); // Safety stop when finishing
 
     showDialog(
         context: context,
@@ -197,7 +225,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   }
 
   // =================================================================
-  // --- NEW PREMIUM UI: APPLE 2026 GLASSMORPHIC SWIPE CONTROL ---
+  // --- PREMIUM UI: APPLE 2026 GLASSMORPHIC SWIPE CONTROL ---
   // =================================================================
   void _showPremiumPowerSlider() {
     showModalBottomSheet(
@@ -341,7 +369,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         backgroundColor: const Color(0xFF1E0045),
         foregroundColor: Colors.white,
         elevation: 0,
-        // --- NEW PREMIUM UI ICON ---
+        // --- PREMIUM UI ICON ---
         actions: [
           IconButton(
             icon: const Icon(CupertinoIcons.slider_horizontal_3, color: Colors.white, size: 28),

@@ -37,6 +37,7 @@ flutter:
   assets:
     - assets/boitexinfo+tn.png
     - assets/sounds/beep.mp3
+    - assets/sounds/scanbeep.mp3
 
   # --- NEW: OFFLINE FONTS FOR PDA ---
   fonts:

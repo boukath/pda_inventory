@@ -5,6 +5,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/app_db_helper.dart';
 
+// --- NEW IMPORTS ---
+import 'geiger_counter_screen.dart';
+import '../models/product.dart';
+
 class EnterpriseCatalogScreen extends StatefulWidget {
   const EnterpriseCatalogScreen({super.key});
 
@@ -110,6 +114,62 @@ class _EnterpriseCatalogScreenState extends State<EnterpriseCatalogScreen> {
               _buildDetailRow("In Stock", "${product['stock_quantity']}"),
               _buildDetailRow("Reorder Level", "${product['reorder_level']}"),
               _buildDetailRow("Location/Zone", "${product['store_location_id']} - ${product['zone_aisle']}"),
+
+              const SizedBox(height: 40),
+
+              // --- NEW: RFID LOCATOR BUTTON ---
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A00E0), // Your theme color
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                  ),
+                  icon: const Icon(CupertinoIcons.waveform_path_ecg, color: Colors.white),
+                  label: Text(
+                    "Locate via RFID",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    // 1. Close the bottom sheet first so it doesn't stay open underneath
+                    Navigator.pop(context);
+
+                    // 2. Map the enterprise dictionary safely to a Product model
+                    // (Just so the Geiger Screen has a nice title to display)
+                    final targetProduct = Product(
+                      id: product['id'] ?? 0,
+                      barcode: product['barcode'] ?? product['sku'] ?? '',
+                      name: product['product_name'] ?? 'Unknown',
+                      price: double.tryParse(product['selling_price']?.toString() ?? '0') ?? 0.0,
+                      costPrice: double.tryParse(product['cost_price']?.toString() ?? '0') ?? 0.0,
+                      category: product['category'] ?? '',
+                      stock: product['stock_quantity'] ?? 0,
+                      lastUpdated: '', // Not strictly needed for the radar screen
+                    );
+
+                    // 3. Navigate directly to the Radar Screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GeigerCounterScreen(
+                          targetEpc: product['epc'] ?? '', // Passes the exact chip ID!
+                          targetProduct: targetProduct,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 30),
             ],
           ),
         ),
