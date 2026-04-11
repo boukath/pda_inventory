@@ -31,6 +31,10 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   final Map<String, int> _inventoryCounts = {};
 
   bool _isScanning = false;
+
+  // --- NEW: Hardware Warmup State ---
+  bool _isHardwareReady = false;
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
 
@@ -52,9 +56,25 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     _audioPlayer.setVolume(1.0);
     _audioPlayer.setReleaseMode(ReleaseMode.loop);
 
-    // FLUTTER COMMANDS THE HARDWARE TO BOOT UP
-    _methodChannel.invokeMethod('connectHardware');
-    _startListeningToHardware();
+    // 1. DELAY HARDWARE BOOT COMMANDS (To keep UI smooth)
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _methodChannel.invokeMethod('connectHardware');
+        _methodChannel.invokeMethod('setLocatorTarget', {'targetEpc': null});
+        _startListeningToHardware();
+      }
+    });
+
+    // 2. HARDWARE WARM-UP TIMER
+    // The physical radio takes ~1-1.5 seconds to fully power on and sync.
+    // We lock the UI during this time so the user knows to wait a brief moment!
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _isHardwareReady = true;
+        });
+      }
+    });
   }
 
   void _startListeningToHardware() {
@@ -62,12 +82,11 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       String data = event.toString().trim();
 
       if (data == 'STATUS:START') {
-        HapticFeedback.lightImpact(); // INSTANT physical feedback
-        // Note: We DO NOT play audio here anymore! We wait for tags.
+        HapticFeedback.lightImpact();
         if (mounted) setState(() => _isScanning = true);
         return;
       } else if (data == 'STATUS:STOP') {
-        _stopAudioLoop(); // Stop sound on trigger release
+        _stopAudioLoop();
         if (mounted) setState(() => _isScanning = false);
         return;
       }
@@ -77,18 +96,15 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
           if (mounted) setState(() => _isScanning = true);
         }
 
-        // --- NEW: START AUDIO & RESET SILENCE TIMER ---
         if (!_isAudioPlaying) {
           _audioPlayer.play(AssetSource('sounds/beep.mp3'));
           _isAudioPlaying = true;
         }
 
-        // Reset the timer. If 250ms pass without a new tag, pause the sound!
         _tagTimeoutTimer?.cancel();
         _tagTimeoutTimer = Timer(const Duration(milliseconds: 250), () {
           _stopAudioLoop();
         });
-        // ----------------------------------------------
 
         String scannedTag = data.replaceAll('TAG:', '');
         if (scannedTag.isNotEmpty) {
@@ -100,7 +116,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     });
   }
 
-  // Helper method to safely stop the sound
   void _stopAudioLoop() {
     _tagTimeoutTimer?.cancel();
     if (_isAudioPlaying) {
@@ -111,9 +126,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    // FLUTTER COMMANDS THE HARDWARE TO GO TO SLEEP
     _methodChannel.invokeMethod('disconnectHardware');
-
     _rfidSubscription?.cancel();
     _pulseController.dispose();
     _stopAudioLoop();
@@ -124,19 +137,14 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   void _processScannedTag(String tag) {
     if (_uniquePhysicalTags.contains(tag)) return;
 
-    // 1. INSTANT UI UPDATE: Update the counts on the screen immediately
     setState(() {
       _uniquePhysicalTags.add(tag);
       _inventoryCounts[tag] = (_inventoryCounts[tag] ?? 0) + 1;
     });
 
-    // 2. BACKGROUND DATABASE FETCH: Fetch data without pausing the scanner
     if (!_productCache.containsKey(tag)) {
-
-      // FIRST: Check the Enterprise Database
       AppDatabaseHelper.instance.getEnterpriseProductByEpc(tag).then((enterpriseData) {
         if (enterpriseData != null) {
-          // If found, convert the Enterprise Map into a Product object
           final product = Product(
             barcode: enterpriseData['epc'] ?? tag,
             name: enterpriseData['product_name'] ?? 'Unknown',
@@ -146,11 +154,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
             stock: enterpriseData['stock_quantity'] ?? 0,
             lastUpdated: enterpriseData['date_added'] ?? DateTime.now().toIso8601String(),
           );
-
           if (mounted) setState(() => _productCache[tag] = product);
-
         } else {
-          // SECOND: Fallback to the Minimarket Database if not found in Enterprise
           DatabaseHelper.instance.getProductByBarcode(tag).then((product) {
             if (mounted) {
               setState(() {
@@ -164,14 +169,16 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
   }
 
   void _toggleScanning() {
-    HapticFeedback.lightImpact(); // Software button also gets instant feedback
+    // Prevent software scanning if the hardware is still warming up
+    if (!_isHardwareReady) return;
+
+    HapticFeedback.lightImpact();
     if (_isScanning) {
       _methodChannel.invokeMethod('stopScan');
-      _stopAudioLoop(); // Stop audio if software button pressed
+      _stopAudioLoop();
       setState(() => _isScanning = false);
     } else {
       _methodChannel.invokeMethod('startScan');
-      // Note: Audio will automatically start when the first tag hits the listener!
       setState(() => _isScanning = true);
     }
   }
@@ -190,7 +197,7 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       _isScanning = false;
     });
     _methodChannel.invokeMethod('stopScan');
-    _stopAudioLoop(); // Safety stop when finishing
+    _stopAudioLoop();
 
     showDialog(
         context: context,
@@ -224,132 +231,131 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
     );
   }
 
-  // =================================================================
-  // --- PREMIUM UI: APPLE 2026 GLASSMORPHIC SWIPE CONTROL ---
-  // =================================================================
   void _showPremiumPowerSlider() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent, // Required for the blur effect
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext context) {
         return StatefulBuilder(
             builder: (context, setSheetState) {
-              return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 50),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                    border: Border(top: BorderSide(color: Colors.white.withOpacity(0.4))),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Handle at the top
-                      Container(
-                        width: 48,
-                        height: 5,
-                        decoration: BoxDecoration(
-                            color: Colors.grey[400],
-                            borderRadius: BorderRadius.circular(10)
+              // --- FIXED: Wrapped in ClipRRect to safely constrain the blur effect
+              return ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 50),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                      border: Border(top: BorderSide(color: Colors.white.withOpacity(0.4))),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 5,
+                          decoration: BoxDecoration(
+                              color: Colors.grey[400],
+                              borderRadius: BorderRadius.circular(10)
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                              "Scanner Range",
-                              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)
-                          ),
-                          Text(
-                              "${_currentPower.toInt()} dBm",
-                              style: GoogleFonts.poppins(fontSize: 18, color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                          "Slide to adjust physical read distance. Lower power helps find single items, max power reads through walls.",
-                          style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 13, height: 1.4)
-                      ),
-                      const SizedBox(height: 32),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                                "Scanner Range",
+                                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)
+                            ),
+                            Text(
+                                "${_currentPower.toInt()} dBm",
+                                style: GoogleFonts.poppins(fontSize: 18, color: const Color(0xFF4A00E0), fontWeight: FontWeight.bold)
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                            "Slide to adjust physical read distance. Lower power helps find single items, max power reads through walls.",
+                            style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 13, height: 1.4)
+                        ),
+                        const SizedBox(height: 32),
 
-                      // THICK SWIPE CAPSULE
-                      LayoutBuilder(
-                          builder: (context, constraints) {
-                            final width = constraints.maxWidth;
-                            const double minPower = 5.0;
-                            const double maxPower = 30.0;
-                            const double range = maxPower - minPower;
+                        LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = constraints.maxWidth;
+                              const double minPower = 5.0;
+                              const double maxPower = 30.0;
+                              const double range = maxPower - minPower;
 
-                            final double percent = (_currentPower - minPower) / range;
+                              final double percent = (_currentPower - minPower) / range;
 
-                            return GestureDetector(
-                              onPanUpdate: (details) {
-                                double deltaPercent = details.primaryDelta! / width;
-                                double newPercent = (percent + deltaPercent).clamp(0.0, 1.0);
-                                double newPower = minPower + (newPercent * range);
+                              return GestureDetector(
+                                // --- FIXED: Changed to onHorizontalDragUpdate ---
+                                onHorizontalDragUpdate: (details) {
+                                  double deltaPercent = details.primaryDelta! / width;
+                                  double newPercent = (percent + deltaPercent).clamp(0.0, 1.0);
+                                  double newPower = minPower + (newPercent * range);
 
-                                // Vibrate PDA when the number changes
-                                if (newPower.toInt() != _currentPower.toInt()) {
-                                  HapticFeedback.lightImpact();
-                                }
+                                  if (newPower.toInt() != _currentPower.toInt()) {
+                                    HapticFeedback.lightImpact();
+                                  }
 
-                                setSheetState(() => _currentPower = newPower);
-                                setState(() => _currentPower = newPower);
-                              },
-                              onPanEnd: (details) {
-                                // Tell the hardware!
-                                _methodChannel.invokeMethod('setTxPower', {"power": _currentPower.toInt()});
-                                HapticFeedback.mediumImpact();
-                              },
-                              child: Container(
-                                height: 75, // Extra thick for gloved warehouse hands!
-                                decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(40),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.05),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      )
-                                    ]
-                                ),
-                                child: Stack(
-                                  children: [
-                                    AnimatedContainer(
-                                      duration: const Duration(milliseconds: 50),
-                                      width: (width * percent).clamp(75.0, width),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                            colors: [Color(0xFF6A11CB), Color(0xFF4A00E0)]
-                                        ),
-                                        borderRadius: BorderRadius.circular(40),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Icon(
-                                          CupertinoIcons.antenna_radiowaves_left_right,
-                                          color: percent > 0.15 ? Colors.white : Colors.grey[600],
-                                          size: 30,
+                                  setSheetState(() => _currentPower = newPower);
+                                  setState(() => _currentPower = newPower);
+                                },
+                                onPanEnd: (details) {
+                                  _methodChannel.invokeMethod('setTxPower', {"power": _currentPower.toInt()});
+                                  HapticFeedback.mediumImpact();
+                                },
+                                child: Container(
+                                  height: 75,
+                                  decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(40),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        )
+                                      ]
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 50),
+                                        // --- FIXED: Changed lower clamp to 0.0 to prevent layout bounds error
+                                        width: (width * percent).clamp(0.0, width),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                              colors: [Color(0xFF6A11CB), Color(0xFF4A00E0)]
+                                          ),
+                                          borderRadius: BorderRadius.circular(40),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Icon(
+                                            CupertinoIcons.antenna_radiowaves_left_right,
+                                            color: percent > 0.15 ? Colors.white : Colors.grey[600],
+                                            size: 30,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-                      ),
-                    ],
+                              );
+                            }
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -358,7 +364,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
       },
     );
   }
-  // =================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +374,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
         backgroundColor: const Color(0xFF1E0045),
         foregroundColor: Colors.white,
         elevation: 0,
-        // --- PREMIUM UI ICON ---
         actions: [
           IconButton(
             icon: const Icon(CupertinoIcons.slider_horizontal_3, color: Colors.white, size: 28),
@@ -380,7 +384,6 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(width: 8),
         ],
-        // ---------------------------
       ),
       body: Column(
         children: [
@@ -419,7 +422,8 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.greenAccent.withOpacity(1.0 - _pulseController.value),
+                                  // --- FIXED: Clamped value to prevent negative opacity crashes ---
+                                  color: Colors.greenAccent.withOpacity((1.0 - _pulseController.value).clamp(0.0, 1.0)),
                                   width: 2,
                                 ),
                               ),
@@ -430,11 +434,17 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
-                          color: _isScanning ? Colors.greenAccent : Colors.redAccent,
+                          // --- NEW: Hardware visual feedback colors ---
+                          color: !_isHardwareReady
+                              ? Colors.grey.shade400
+                              : (_isScanning ? Colors.greenAccent : Colors.redAccent),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _isScanning ? CupertinoIcons.pause_solid : CupertinoIcons.play_arrow_solid,
+                          // --- NEW: Hardware visual feedback icons ---
+                          !_isHardwareReady
+                              ? CupertinoIcons.hourglass
+                              : (_isScanning ? CupertinoIcons.pause_solid : CupertinoIcons.play_arrow_solid),
                           color: const Color(0xFF1E0045),
                           size: 50,
                         ),
@@ -443,9 +453,17 @@ class _RfidScreenState extends State<RfidScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 20),
+                // --- NEW: Dynamic Warm-Up Text ---
                 Text(
-                  _isScanning ? AppLocalizations.of(context)!.scanningActive : AppLocalizations.of(context)!.pressToStartScanning,
-                  style: GoogleFonts.poppins(color: _isScanning ? Colors.greenAccent : Colors.white70, fontWeight: FontWeight.w600),
+                  !_isHardwareReady
+                      ? "Warming up scanner..."
+                      : (_isScanning ? AppLocalizations.of(context)!.scanningActive : AppLocalizations.of(context)!.pressToStartScanning),
+                  style: GoogleFonts.poppins(
+                      color: !_isHardwareReady
+                          ? Colors.amber
+                          : (_isScanning ? Colors.greenAccent : Colors.white70),
+                      fontWeight: FontWeight.w600
+                  ),
                 ),
               ],
             ),

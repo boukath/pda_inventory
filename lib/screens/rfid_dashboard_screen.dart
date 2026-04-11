@@ -4,11 +4,12 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart'; // <-- Needed for Method/Event Channels
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart'; // <-- Needed for language switcher
+import 'package:provider/provider.dart';
 
-import '../providers/locale_provider.dart'; // <-- Needed for changing language
-import '../l10n/app_localizations.dart'; // <-- Needed for translated strings
+import '../providers/locale_provider.dart';
+import '../l10n/app_localizations.dart';
 
 import 'enterprise_catalog_screen.dart';
 import 'mode_selection_screen.dart';
@@ -25,30 +26,90 @@ class RfidDashboardScreen extends StatefulWidget {
 }
 
 class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
+  // --- HARDWARE CHANNELS ---
+  static const EventChannel _rfidChannel = EventChannel('com.pda_inventory/rfid_events');
+  static const MethodChannel _methodChannel = MethodChannel('com.pda_inventory/rfid_methods');
+  StreamSubscription? _rfidSubscription;
+
+  // --- HARDWARE STATE ---
+  int? _batteryLevel;
+
   // --- SECRET ADMIN MENU VARIABLES ---
   int _secretTapCount = 0;
   Timer? _secretTapTimer;
-  final String _adminPin = "2026"; // <-- Your Kiosk Escape PIN
+  final String _adminPin = "2026";
+
+  // --- NAVIGATION LOCK TO PREVENT DOUBLE TAPS ---
+  bool _isNavigating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupBatteryListener();
+    _fetchBatteryLevel();
+  }
 
   @override
   void dispose() {
-    _secretTapTimer?.cancel(); // Cancel secret Kiosk timer
+    _rfidSubscription?.cancel();
+    _secretTapTimer?.cancel();
     super.dispose();
+  }
+
+  // --- 1. LISTEN TO HARDWARE BATTERY UPDATES ---
+  void _setupBatteryListener() {
+    _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
+      String data = event.toString().trim();
+
+      // If Kotlin sends us a battery update, update the UI
+      if (data.startsWith('BATTERY:')) {
+        if (mounted) {
+          setState(() {
+            _batteryLevel = int.tryParse(data.replaceAll('BATTERY:', ''));
+          });
+        }
+      }
+    }, onError: (dynamic error) {
+      debugPrint('RFID Stream Error: ${error.message}');
+    });
+  }
+
+  // --- 2. ASK HARDWARE FOR INITIAL BATTERY ---
+  Future<void> _fetchBatteryLevel() async {
+    try {
+      await _methodChannel.invokeMethod('getBattery');
+    } catch (e) {
+      debugPrint("Could not fetch battery: $e");
+    }
+  }
+
+  // --- SAFE NAVIGATION HANDLER ---
+  void _safeNavigate(Widget targetScreen) {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+
+    Future.delayed(const Duration(milliseconds: 50), () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => targetScreen),
+      ).then((_) {
+        // Fetch battery again when we come back to this screen!
+        _fetchBatteryLevel();
+        if (mounted) setState(() => _isNavigating = false);
+      });
+    });
   }
 
   // --- SECRET TAP LOGIC ---
   void _handleSecretTap() {
     _secretTapCount++;
-
-    // Reset the counter if they stop tapping for more than 1 second
     _secretTapTimer?.cancel();
     _secretTapTimer = Timer(const Duration(milliseconds: 1000), () {
       _secretTapCount = 0;
     });
 
-    // If they tap 7 times fast, trigger the PIN pad!
     if (_secretTapCount >= 7) {
-      _secretTapCount = 0; // Reset
+      _secretTapCount = 0;
       _showAdminPinDialog();
     }
   }
@@ -59,30 +120,28 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Force them to enter pin or cancel
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-            AppLocalizations.of(context)!.developerMode, // <-- Localized
+            AppLocalizations.of(context)!.developerMode,
             style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: const Color(0xFF1E0045))
         ),
         content: TextField(
           controller: pinController,
-          obscureText: true, // Hides the PIN as they type
+          obscureText: true,
           keyboardType: TextInputType.number,
-          maxLength: 4, // Assuming a 4-digit PIN
+          maxLength: 4,
           decoration: InputDecoration(
-            labelText: AppLocalizations.of(context)!.enterAdminPin, // <-- Localized
+            labelText: AppLocalizations.of(context)!.enterAdminPin,
             prefixIcon: const Icon(Icons.lock),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-            },
-            child: Text(AppLocalizations.of(context)!.cancel, style: GoogleFonts.poppins(color: Colors.grey)), // <-- Localized
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppLocalizations.of(context)!.cancel, style: GoogleFonts.poppins(color: Colors.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -92,7 +151,6 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
             ),
             onPressed: () {
               if (pinController.text == _adminPin) {
-                // SUCCESS! Take the developer to the secret mode selection screen
                 Navigator.pop(context);
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -100,14 +158,13 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                       (route) => false,
                 );
               } else {
-                // FAILURE! Wrong PIN.
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppLocalizations.of(context)!.incorrectPin), backgroundColor: Colors.red), // <-- Localized
+                  SnackBar(content: Text(AppLocalizations.of(context)!.incorrectPin), backgroundColor: Colors.red),
                 );
               }
             },
-            child: Text(AppLocalizations.of(context)!.unlock, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), // <-- Localized
+            child: Text(AppLocalizations.of(context)!.unlock, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -122,7 +179,6 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -141,19 +197,25 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // --- WRAPPED THE TITLE IN GESTURE DETECTOR ---
                       GestureDetector(
-                        onTap: _handleSecretTap, // Hidden 7-tap trigger
+                        onTap: _handleSecretTap,
                         child: Container(
-                          color: Colors.transparent, // Ensures the whole area is tappable
+                          color: Colors.transparent,
                           child: Text(
-                            AppLocalizations.of(context)!.appTitle, // <-- Localized Title
+                            AppLocalizations.of(context)!.appTitle,
                             style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1.0),
                           ),
                         ),
                       ),
-                      // --- NEW: LANGUAGE SWITCHER GLOBE ---
-                      _buildLanguageButton(context),
+
+                      // --- UPDATED TOP RIGHT CORNER: BATTERY & LANGUAGE ---
+                      Row(
+                        children: [
+                          _buildBatteryIndicator(),
+                          const SizedBox(width: 12),
+                          _buildLanguageButton(context),
+                        ],
+                      )
                     ],
                   ),
                 ),
@@ -168,36 +230,27 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                       children: [
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.rfidScanner, // <-- Localized
+                          title: AppLocalizations.of(context)!.rfidScanner,
                           icon: Icons.wifi_tethering,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidScreen()));
-                          },
+                          onTap: () => _safeNavigate(const RfidScreen()),
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.rfidInventory, // <-- Localized
+                          title: AppLocalizations.of(context)!.rfidInventory,
                           icon: CupertinoIcons.archivebox,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const RfidInventoryScreen()));
-                          },
+                          onTap: () => _safeNavigate(const RfidInventoryScreen()),
                         ),
-                        // --- Register Product Card ---
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.registerTag, // <-- Localized
+                          title: AppLocalizations.of(context)!.registerTag,
                           icon: CupertinoIcons.add_circled_solid,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const AddRfidProductScreen()));
-                          },
+                          onTap: () => _safeNavigate(const AddRfidProductScreen()),
                         ),
                         _buildGlassCard(
                           context: context,
-                          title: AppLocalizations.of(context)!.enterpriseCatalog, // <-- Localized
+                          title: AppLocalizations.of(context)!.enterpriseCatalog,
                           icon: CupertinoIcons.book_solid,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const EnterpriseCatalogScreen()));
-                          },
+                          onTap: () => _safeNavigate(const EnterpriseCatalogScreen()),
                         ),
                       ],
                     ),
@@ -205,6 +258,50 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- BATTERY INDICATOR WIDGET ---
+  Widget _buildBatteryIndicator() {
+    if (_batteryLevel == null) {
+      return const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2)
+      );
+    }
+
+    IconData icon;
+    Color color;
+
+    if (_batteryLevel! > 75) {
+      icon = CupertinoIcons.battery_100;
+      color = Colors.greenAccent;
+    } else if (_batteryLevel! > 25) {
+      icon = CupertinoIcons.battery_25;
+      color = Colors.yellowAccent;
+    } else {
+      icon = CupertinoIcons.battery_0;
+      color = Colors.redAccent;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 4),
+          Text(
+            '$_batteryLevel%',
+            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
           ),
         ],
       ),
@@ -242,43 +339,48 @@ class _RfidDashboardScreenState extends State<RfidDashboardScreen> {
     );
   }
 
-  // --- GLASSMORPHISM CARD WIDGET ---
+  // --- HIGH-PERFORMANCE GLASSMORPHISM CARD WIDGET ---
   Widget _buildGlassCard({required BuildContext context, required String title, required IconData icon, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 10))],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white.withOpacity(0.25), Colors.white.withOpacity(0.05)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 52, color: Colors.white.withOpacity(0.9)),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white, letterSpacing: 0.5),
-                    ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 10))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              splashColor: Colors.white.withOpacity(0.4),
+              highlightColor: Colors.white.withOpacity(0.2),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.white.withOpacity(0.25), Colors.white.withOpacity(0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 52, color: Colors.white.withOpacity(0.9)),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

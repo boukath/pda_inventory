@@ -47,7 +47,11 @@ class _GeigerCounterScreenState extends State<GeigerCounterScreen> {
     // 1. BOOT HARDWARE
     _methodChannel.invokeMethod('connectHardware');
 
-    // 2. LISTEN CONSTANTLY FOR HARDWARE TRIGGER
+    // 2. TELL HARDWARE WHAT TO LOOK FOR (Only do this once!)
+    // This prevents the hardware collision when pulling the trigger!
+    _methodChannel.invokeMethod('setLocatorTarget', {'targetEpc': widget.targetEpc});
+
+    // 3. LISTEN CONSTANTLY FOR HARDWARE TRIGGER
     _startListeningToHardware();
   }
 
@@ -60,8 +64,7 @@ class _GeigerCounterScreenState extends State<GeigerCounterScreen> {
         HapticFeedback.lightImpact();
         if (mounted) {
           setState(() => _isScanning = true);
-          // Explicitly tell Android which tag to look for when trigger is pulled
-          _methodChannel.invokeMethod('startLocator', {'targetEpc': widget.targetEpc});
+          // REMOVED 'startLocator' here to fix the race condition!
         }
         return;
       }
@@ -73,7 +76,7 @@ class _GeigerCounterScreenState extends State<GeigerCounterScreen> {
             _signalPercentage = 0.0; // Reset visual
           });
         }
-        _methodChannel.invokeMethod('stopLocator');
+        // REMOVED 'stopLocator' here!
         return;
       }
 
@@ -115,7 +118,8 @@ class _GeigerCounterScreenState extends State<GeigerCounterScreen> {
     });
 
     try {
-      await _methodChannel.invokeMethod('startLocator', {'targetEpc': widget.targetEpc});
+      // Use 'startScan' since the target is already set in initState
+      await _methodChannel.invokeMethod('startScan');
     } on PlatformException catch (e) {
       debugPrint("Error starting scanner: ${e.message}");
       setState(() => _isScanning = false);
@@ -127,7 +131,8 @@ class _GeigerCounterScreenState extends State<GeigerCounterScreen> {
     _isBeeping = false;
 
     try {
-      await _methodChannel.invokeMethod('stopLocator');
+      // Use 'stopScan' matching our updated Kotlin code
+      await _methodChannel.invokeMethod('stopScan');
     } catch (e) {
       debugPrint("Error stopping scanner: $e");
     }

@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/app_db_helper.dart';
 import '../l10n/app_localizations.dart';
-import '../utils/epc_generator.dart'; // <-- IMPORT YOUR GENERATOR HERE
+import '../utils/epc_generator.dart';
 
 class AddRfidProductScreen extends StatefulWidget {
   const AddRfidProductScreen({super.key});
@@ -24,7 +24,10 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   StreamSubscription? _rfidSubscription;
 
   bool _isScanning = false;
-  bool _isWriting = false; // <-- NEW: Tracks if we are currently writing to a tag
+  bool _isWriting = false;
+
+  // --- NEW: Hardware Warmup State ---
+  bool _isHardwareReady = false;
 
   // --- PRODUCT TYPE TOGGLE ---
   String _productType = 'retail';
@@ -70,10 +73,27 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   @override
   void initState() {
     super.initState();
-    _setupRfidScanner();
+
+    // 1. DELAY HARDWARE BOOT COMMANDS (To keep UI smooth during page transition)
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _methodChannel.invokeMethod('connectHardware');
+        _methodChannel.invokeMethod('setLocatorTarget', {'targetEpc': null});
+        _setupRfidScanner();
+      }
+    });
+
+    // 2. HARDWARE WARM-UP TIMER
+    // Locks the UI briefly while the physical radio powers up.
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _isHardwareReady = true;
+        });
+      }
+    });
   }
 
-  // --- UPDATED: LISTEN FOR SCAN AND WRITE EVENTS ---
   void _setupRfidScanner() {
     _rfidSubscription = _rfidChannel.receiveBroadcastStream().listen((dynamic event) {
       final String data = event.toString().trim();
@@ -105,6 +125,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   }
 
   Future<void> _startScanning() async {
+    if (!_isHardwareReady) return; // Safety check
     setState(() => _isScanning = true);
     try { await _methodChannel.invokeMethod('startScan'); } catch (e) { setState(() => _isScanning = false); }
   }
@@ -114,15 +135,17 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
     try { await _methodChannel.invokeMethod('stopScan'); } catch (e) { /* Handle error quietly */ }
   }
 
-  // --- NEW: TRIGGER THE HARDWARE WRITE ---
   Future<void> _writeToTag() async {
+    if (!_isHardwareReady) return; // Safety check
+
     String currentEpc = _epcController.text.trim();
 
-    // We removed the strict 24-character limit!
+    // Safely stop the scanner from Flutter side before writing
+    if (_isScanning) {
+      await _stopScanning();
+      await Future.delayed(const Duration(milliseconds: 200)); // UI delay
+    }
 
-    // Optional Safety Check: RFID tags write data in Hexadecimal format.
-    // Hex pairs usually require an *even* number of characters (e.g., 28, 36).
-    // If the user enters an odd number (like 7 characters), it might fail on the hardware side.
     if (currentEpc.isNotEmpty && currentEpc.length % 2 != 0) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -130,21 +153,10 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
               backgroundColor: Colors.orange
           )
       );
-      // We are just showing a warning, but we still allow the write attempt to proceed!
-    }
-
-    if (currentEpc.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Attempting to write an empty tag...'),
-              backgroundColor: Colors.blue
-          )
-      );
     }
 
     setState(() => _isWriting = true);
     try {
-      // Ask Android to write this EPC (whatever length it is)
       await _methodChannel.invokeMethod('writeEpc', {"newEpc": currentEpc});
     } catch (e) {
       setState(() => _isWriting = false);
@@ -155,6 +167,7 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
   @override
   void dispose() {
     _stopScanning();
+    _methodChannel.invokeMethod('disconnectHardware'); // Ensure we release the sled
     _rfidSubscription?.cancel();
     _customFields.forEach((key, controller) => controller.dispose());
     super.dispose();
@@ -376,15 +389,32 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.wifi_tethering, size: 40, color: _isScanning ? Colors.red : const Color(0xFF4A00E0)),
+            // --- UPDATED: Dynamic icon based on ready state ---
+            if (!_isHardwareReady)
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 3),
+              )
+            else
+              Icon(Icons.wifi_tethering, size: 40, color: _isScanning ? Colors.red : const Color(0xFF4A00E0)),
+
             const SizedBox(height: 10),
-            Text(AppLocalizations.of(context)!.hardwareTagLink, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+
+            // --- UPDATED: Dynamic text based on ready state ---
+            Text(
+                !_isHardwareReady ? "Warming up scanner..." : AppLocalizations.of(context)!.hardwareTagLink,
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: !_isHardwareReady ? Colors.amber[700] : Colors.black87
+                )
+            ),
             const SizedBox(height: 16),
 
             // --- UPDATED EPC FIELD ---
             TextField(
               controller: _epcController,
-              // maxLength: 24, // <-- REMOVE OR COMMENT OUT THIS LINE!
               textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
                 labelText: AppLocalizations.of(context)!.scannedEpcCode,
@@ -421,7 +451,8 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                         _isScanning ? AppLocalizations.of(context)!.stopScanning : "Read Tag",
                         style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
                     ),
-                    onPressed: _isScanning ? _stopScanning : _startScanning,
+                    // --- UPDATED: Disable if not ready ---
+                    onPressed: (!_isHardwareReady || _isWriting) ? null : (_isScanning ? _stopScanning : _startScanning),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -440,7 +471,8 @@ class _AddRfidProductScreenState extends State<AddRfidProductScreen> {
                         "Write Tag",
                         style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)
                     ),
-                    onPressed: _isWriting ? null : _writeToTag,
+                    // --- UPDATED: Disable if not ready or currently scanning ---
+                    onPressed: (!_isHardwareReady || _isWriting || _isScanning) ? null : _writeToTag,
                   ),
                 ),
               ],

@@ -25,6 +25,9 @@ class MainActivity: FlutterActivity() {
     // --- NEW: Tracks the specific tag we are looking for in Radar Mode ---
     private var locatorTargetEpc: String? = null
 
+    // --- NEW: State protection to prevent hardware collisions! ---
+    private var isHardwareScanning = false
+
     // =========================================================
     // --- OPTIMIZATION: Pre-allocate memory for 2048 tags ---
     // Prevents the HashSet from pausing to resize itself during heavy scans
@@ -64,18 +67,11 @@ class MainActivity: FlutterActivity() {
                     methodResult.success(null)
                 }
                 // ==========================================
-                // --- NEW: LOCATOR MODE COMMANDS ---
+                // --- UPDATED: LOCATOR MODE COMMANDS ---
                 // ==========================================
-                "startLocator" -> {
+                "setLocatorTarget" -> {
                     locatorTargetEpc = call.argument<String>("targetEpc")
-                    Log.d("RFID_DEBUG", "🎯 Locator Mode Started for Target: $locatorTargetEpc")
-                    startInventory()
-                    methodResult.success(null)
-                }
-                "stopLocator" -> {
-                    locatorTargetEpc = null
-                    Log.d("RFID_DEBUG", "🛑 Locator Mode Stopped")
-                    stopInventory()
+                    Log.d("RFID_DEBUG", "🎯 Target Set: $locatorTargetEpc")
                     methodResult.success(null)
                 }
                 // ==========================================
@@ -159,7 +155,7 @@ class MainActivity: FlutterActivity() {
 
     override fun onPause() {
         setBarcodeKeyMapOn(true)
-        mReader?.RF_StopInventory()
+        stopInventory() // Safely stop using our new method
         super.onPause()
     }
 
@@ -169,23 +165,46 @@ class MainActivity: FlutterActivity() {
         super.onDestroy()
     }
 
+    // --- UPDATED: Hardware State Protection Added ---
     private fun startInventory() {
+        if (isHardwareScanning) {
+            Log.d("RFID_DEBUG", "⚠️ Ignored start request: Hardware is already scanning")
+            return
+        }
+
         if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
             scannedTags.clear()
             val result = mReader?.RF_PerformInventory(true, false, false)
-            Log.d("RFID_DEBUG", "✅ Software Scan Triggered (Result: $result)")
+            if (result == SDConsts.RFResult.SUCCESS) {
+                isHardwareScanning = true
+                Log.d("RFID_DEBUG", "✅ Hardware Scan Started")
+            }
         } else {
             Log.e("RFID_DEBUG", "❌ Cannot scan. Sled disconnected.")
             connectToSled()
         }
     }
 
+    // --- UPDATED: Hardware State Protection Added ---
     private fun stopInventory() {
+        if (!isHardwareScanning) return // Prevent overlapping stop commands
+
         mReader?.RF_StopInventory()
+        isHardwareScanning = false
+        Log.d("RFID_DEBUG", "🛑 Hardware Scan Stopped")
     }
 
+    // --- UPDATED: Prevent Read/Write Collisions ---
     private fun writeTagEpc(newEpc: String) {
         if (mReader?.SD_GetConnectState() == SDConsts.SDConnectState.CONNECTED) {
+
+            // PROTECT AGAINST READ/WRITE COLLISION!
+            // We MUST stop scanning before we write to the tag.
+            if (isHardwareScanning) {
+                stopInventory()
+                Thread.sleep(150) // Give the hardware 150ms to clear its buffers
+            }
+
             Log.d("RFID_DEBUG", "✏️ Attempting to write EPC: $newEpc")
 
             Thread {
